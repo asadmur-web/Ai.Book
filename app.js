@@ -64,7 +64,7 @@ function applyAuthLayout() {
   el("fullNameWrap").classList.toggle("hidden", !isRegister);
   el("commonIdWrap").classList.toggle("hidden", !isRegister);
   el("studentGradeWrap").classList.toggle("hidden", !(isRegister && role === "student"));
-  el("emailWrap").classList.toggle("hidden", !(isRegister && (role === "teacher" || role === "admin")));
+  el("emailWrap").classList.toggle("hidden", !isRegister);
   el("teacherSecretWrap").classList.toggle("hidden", !(isRegister && role === "teacher"));
   el("teacherAssignments").classList.toggle("hidden", !(isRegister && role === "teacher"));
   el("adminNameWrap").classList.toggle("hidden", !(isRegister && role === "admin"));
@@ -369,14 +369,17 @@ function registerUser() {
 
   if (role === "student") {
     const grade = el("studentGrade").value;
-    const dupName = state.data.users.some((u) => u.fullName === fullName);
-    if (dupName) {
+    const email = el("email").value.trim().toLowerCase();
+    if (!email) return "بريد الطالب مطلوب.";
+
+    const dup = state.data.users.some((u) => u.fullName === fullName || (u.email && u.email.toLowerCase() === email));
+    if (dup) {
       setMode("login");
       return "أنت مسجل دخول من قبل، انتقلنا بك إلى خانة مسجل الدخول.";
     }
-    const user = { id, fullName, role: "student", grade, password };
+    const user = { id, fullName, role: "student", grade, email, password };
     state.data.users.push(user);
-    session = { id, fullName, role: "student", grade };
+    session = { id, fullName, role: "student", grade, email };
   }
 
   if (role === "teacher") {
@@ -435,7 +438,7 @@ function loginUser() {
   const user = findByIdentifier(identifier);
   if (!user || user.password !== password) return "بيانات الدخول غير صحيحة.";
 
-  if (user.role === "student") session = { id: user.id, fullName: user.fullName, role: "student", grade: user.grade };
+  if (user.role === "student") session = { id: user.id, fullName: user.fullName, role: "student", grade: user.grade, email: user.email };
   if (user.role === "teacher") session = { id: user.id, fullName: user.fullName, role: "teacher", email: user.email, assignments: user.assignments || {} };
   if (user.role === "admin") session = { id: user.id, fullName: user.fullName, role: "admin", position: user.position, email: user.email };
 
