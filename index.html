@@ -13,9 +13,11 @@
         <aside class="intro">
           <span class="logo-pill">AI Book</span>
           <h1>منصة مدرسية تفاعلية شاملة</h1>
-          <p>
-            فصول، منشورات، دردشات مباشرة، وإدارة مدرسية مع مساعد ذكي متكامل.
-          </p>
+          <p>فصول، منشورات، دردشات مباشرة، وإدارة مدرسية مع مساعد ذكي متكامل.</p>
+          <ul class="rules">
+            <li>ID الطالب: حرفان + 4 أرقام فقط (مثال: ST1234).</li>
+            <li>كلمة المرور: 7 خانات على الأقل وتحتوي أحرف + أرقام.</li>
+          </ul>
         </aside>
 
         <section class="auth">
@@ -23,7 +25,7 @@
           <div class="tabs">
             <button class="tab active" data-role="student">طالب</button>
             <button class="tab" data-role="teacher">معلم</button>
-            <button class="tab" data-role="admin">إدارة</button>
+            <button class="tab" data-role="admin">الإدارة المدرسية</button>
           </div>
 
           <form id="loginForm" class="form">
@@ -32,7 +34,7 @@
             </label>
 
             <label id="studentIdWrap">ID الطالب
-              <input id="studentId" type="text" placeholder="مثال ST1234" />
+              <input id="studentId" type="text" placeholder="ST1234" />
             </label>
 
             <label id="studentGradeWrap">الصف
@@ -52,6 +54,15 @@
             </label>
 
             <div id="teacherAssignments" class="hidden"></div>
+
+            <label id="adminNameWrap" class="hidden">جهة الإدارة
+              <select id="adminPosition">
+                <option value="مدير">مدير</option>
+                <option value="نائب المدير">نائب المدير</option>
+                <option value="سكرتير">سكرتير</option>
+                <option value="مرشد تربوي">مرشد تربوي</option>
+              </select>
+            </label>
 
             <label id="adminSecretWrap" class="hidden">الرقم السري للإدارة
               <input id="adminSecret" type="password" maxlength="7" inputmode="numeric" placeholder="•••••••" />
@@ -135,7 +146,7 @@
           <section class="panel">
             <h3>المساعد الذكي (ChatGPT)</h3>
             <div class="compose">
-              <input id="openaiKey" type="password" placeholder="OpenAI API Key (اختياري للحفظ محلياً)" />
+              <input id="openaiKey" type="password" placeholder="OpenAI API Key (لن يتم تضمينه في الكود)" />
               <input id="aiPrompt" type="text" placeholder="اكتب سؤالك..." />
               <button id="askAi" class="btn primary" type="button">اسأل</button>
             </div>
