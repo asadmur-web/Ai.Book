@@ -4,19 +4,10 @@ const ADMIN_NAME = "ادارة المدرسة";
 
 const gradeNames = ["السادس", "السابع", "الثامن", "التاسع", "العاشر"];
 const baseSubjects = [
-  "اللغة العربية",
-  "اللغة الانجليزية",
-  "التربية الاسلامية",
-  "التكنولوجيا و البرمجة",
-  "المواد الشرعية",
-  "الرياضيات",
-  "العلوم",
-  "الدراسات الاجتماعية",
-  "التربية البدنية",
+  "اللغة العربية", "اللغة الانجليزية", "التربية الاسلامية", "التكنولوجيا و البرمجة",
+  "المواد الشرعية", "الرياضيات", "العلوم", "الدراسات الاجتماعية", "التربية البدنية",
 ];
-const grade10Subjects = baseSubjects
-  .filter((s) => s !== "العلوم")
-  .concat(["فيزياء", "كيمياء", "احياء"]);
+const grade10Subjects = baseSubjects.filter((s) => s !== "العلوم").concat(["فيزياء", "كيمياء", "احياء"]);
 
 const accounts = [
   { id: "ST1001", fullName: "خالد أحمد يوسف علي", role: "student", grade: "السادس" },
@@ -26,469 +17,411 @@ const accounts = [
   { id: "ST1005", fullName: "عبدالله كريم ناصر خالد", role: "student", grade: "العاشر" },
 ];
 
+const el = (id) => document.getElementById(id);
+const roleTabs = document.querySelectorAll(".tab");
+
+function safeParse(raw, fallback) {
+  try { return JSON.parse(raw); } catch { return fallback; }
+}
+function esc(v) {
+  return String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+function subjectsForGrade(grade) { return grade === "العاشر" ? grade10Subjects : baseSubjects; }
+function uid(prefix = "id") { return `${prefix}-${Math.random().toString(36).slice(2, 10)}`; }
+
 const state = {
   role: "student",
   selectedMembers: [],
+  selectedChatId: null,
   data: safeParse(localStorage.getItem("aiBookData") || '{"posts":[],"chats":[]}', { posts: [], chats: [] }),
 };
+let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
-
-function safeParse(raw, fallback) {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-const el = (id) => document.getElementById(id);
-const roleButtons = document.querySelectorAll(".tab");
-
-function subjectsForGrades(grades) {
-  const all = new Set();
-  grades.forEach((grade) => {
-    (grade === "العاشر" ? grade10Subjects : baseSubjects).forEach((s) => all.add(s));
-  });
-  return [...all];
-}
+function saveData() { localStorage.setItem("aiBookData", JSON.stringify(state.data)); }
+function saveSession(s) { localStorage.setItem("aiBookSession", JSON.stringify(s)); }
+function clearSession() { localStorage.removeItem("aiBookSession"); }
 
 function setRole(role) {
   state.role = role;
-  roleButtons.forEach((b) => b.classList.toggle("active", b.dataset.role === role));
-
-  el("emailField").classList.toggle("hidden", role !== "teacher");
-  el("teacherCodeField").classList.toggle("hidden", role !== "teacher");
-  el("teacherGradesField").classList.toggle("hidden", role !== "teacher");
-  el("teacherSubjectsField").classList.toggle("hidden", role !== "teacher");
-
-  el("studentGradeField").classList.toggle("hidden", role !== "student");
-  el("idField").classList.toggle("hidden", role !== "student");
-  el("rememberField").classList.toggle("hidden", role !== "student");
-
-  el("adminCodeField").classList.toggle("hidden", role !== "admin");
+  roleTabs.forEach((b) => b.classList.toggle("active", b.dataset.role === role));
+  el("studentIdWrap").classList.toggle("hidden", role !== "student");
+  el("studentGradeWrap").classList.toggle("hidden", role !== "student");
+  el("teacherEmailWrap").classList.toggle("hidden", role !== "teacher");
+  el("teacherSecretWrap").classList.toggle("hidden", role !== "teacher");
+  el("teacherAssignments").classList.toggle("hidden", role !== "teacher");
+  el("adminSecretWrap").classList.toggle("hidden", role !== "admin");
 }
 
-function renderLoginOptions() {
+function renderLoginSetup() {
   el("studentGrade").innerHTML = gradeNames.map((g) => `<option value="${g}">${g}</option>`).join("");
-
-  el("teacherGrades").innerHTML = gradeNames
-    .map(
-      (g) =>
-        `<label><input type="checkbox" name="teacherGrade" value="${g}"> ${g}</label>`
-    )
-    .join("");
-  renderTeacherSubjects();
+  renderTeacherAssignmentPicker();
 }
 
-function renderTeacherSubjects() {
-  const selectedGrades = [...document.querySelectorAll('input[name="teacherGrade"]:checked')].map((i) => i.value);
-  const subjects = selectedGrades.length ? subjectsForGrades(selectedGrades) : baseSubjects;
-  const previously = [...document.querySelectorAll('input[name="teacherSubject"]:checked')].map((i) => i.value);
-
-  el("teacherSubjects").innerHTML = subjects
-    .map((s) => `<label><input type="checkbox" name="teacherSubject" value="${s}"> ${s}</label>`)
-    .join("");
-
-  previously.forEach((subj) => {
-    const input = document.querySelector(`input[name="teacherSubject"][value="${CSS.escape(subj)}"]`);
-    if (input) input.checked = true;
-  });
+function renderTeacherAssignmentPicker() {
+  const wrap = el("teacherAssignments");
+  wrap.innerHTML = `
+    <label>اختر الصفوف التي تدرّسها</label>
+    <div class="subject-grid">${gradeNames.map((g) => `<label><input type="checkbox" class="gradePick" value="${g}"/> ${g}</label>`).join("")}</div>
+    <div id="perGradeSubjects"></div>
+  `;
 }
 
-function readTeacherProfile() {
-  const grades = [...document.querySelectorAll('input[name="teacherGrade"]:checked')].map((i) => i.value);
-  const subjects = [...document.querySelectorAll('input[name="teacherSubject"]:checked')].map((i) => i.value);
-  return { grades, subjects };
+function renderPerGradeSubjects() {
+  const selectedGrades = [...document.querySelectorAll(".gradePick:checked")].map((i) => i.value);
+  const holder = el("perGradeSubjects");
+  const existing = safeParse(holder.dataset.selection || "{}", {});
+
+  holder.innerHTML = selectedGrades.map((g) => {
+    const options = subjectsForGrade(g);
+    const selected = existing[g] || [];
+    return `
+      <div class="assignment-card" data-grade="${g}">
+        <strong>${g}</strong>
+        <p>اختر مادتين كحد أقصى لهذا الصف:</p>
+        <div class="subject-grid">
+          ${options.map((s) => `<label><input type="checkbox" class="subjectPick" data-grade="${g}" value="${s}" ${selected.includes(s) ? "checked" : ""}/> ${s}</label>`).join("")}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  holder.dataset.selection = JSON.stringify(existing);
 }
 
-function saveSession(session, remember) {
-  if (session.role === "student" && remember) {
-    localStorage.setItem("aiBookSession", JSON.stringify(session));
-    sessionStorage.removeItem("aiBookSession");
-  } else {
-    sessionStorage.setItem("aiBookSession", JSON.stringify(session));
-    localStorage.removeItem("aiBookSession");
+function collectTeacherAssignments() {
+  const selectedGrades = [...document.querySelectorAll(".gradePick:checked")].map((i) => i.value);
+  const map = {};
+  for (const grade of selectedGrades) {
+    const subs = [...document.querySelectorAll(`.subjectPick[data-grade="${grade}"]:checked`)].map((i) => i.value);
+    map[grade] = subs;
   }
+  return map;
 }
 
-function loadSession() {
-  const v = localStorage.getItem("aiBookSession") || sessionStorage.getItem("aiBookSession");
-  return v ? safeParse(v, null) : null;
+function validateTeacherAssignments(assignments) {
+  const grades = Object.keys(assignments);
+  if (!grades.length) return "اختر صفاً واحداً على الأقل.";
+  for (const grade of grades) {
+    const subs = assignments[grade] || [];
+    if (!subs.length) return `اختر مادة واحدة على الأقل لصف ${grade}.`;
+    if (subs.length > 2) return `لا يمكن اختيار أكثر من مادتين لصف ${grade}.`;
+    const valid = subjectsForGrade(grade);
+    if (subs.some((s) => !valid.includes(s))) return `مواد غير صالحة في صف ${grade}.`;
+  }
+  return "";
 }
 
-function clearSession() {
-  localStorage.removeItem("aiBookSession");
-  sessionStorage.removeItem("aiBookSession");
-}
-
-function saveData() {
-  localStorage.setItem("aiBookData", JSON.stringify(state.data));
-}
-
-function canTeacherTarget(session, grade, subject) {
-  return session.grades.includes(grade) && session.subjects.includes(subject);
-}
-
-function renderDashboard(session) {
+function renderDashboard() {
   el("loginScreen").classList.add("hidden");
   el("dashboard").classList.remove("hidden");
-
-  const byRole = {
-    student: "لوحة الطالب: مهامك، دردشات صفك، ومنشورات معلميك.",
-    teacher: "لوحة المعلم: إدارة الصفوف، المنشورات، والدردشات الخاصة بك.",
-    admin: "لوحة الإدارة: متابعة عامة وإشراف المنصة.",
-  };
-
   el("welcome").textContent = `مرحباً ${session.fullName}`;
-  el("subtitle").textContent = byRole[session.role];
+  el("subtitle").textContent = session.role === "teacher"
+    ? "لوحة المعلم: منشورات، دردشات، وإدارة صفوفك." : session.role === "admin"
+    ? "لوحة الإدارة: متابعة شاملة ومنشورات عامة." : "لوحة الطالب: منشوراتك ودردشات صفك.";
 
-  el("teacherPostComposer").classList.toggle("hidden", session.role !== "teacher");
-  el("adminPostComposer").classList.toggle("hidden", session.role !== "admin");
+  el("teacherPostBox").classList.toggle("hidden", session.role !== "teacher");
+  el("adminPostBox").classList.toggle("hidden", session.role !== "admin");
   el("teacherChatTools").classList.toggle("hidden", session.role !== "teacher");
 
-  renderClasses(session);
-  renderPosts(session);
-  renderChats(session);
-  hydrateTeacherSelectors(session);
+  hydrateTeacherSelectors();
+  el("openaiKey").value = localStorage.getItem("openai_api_key") || "";
+  renderClasses();
+  renderPosts();
+  renderChatRooms();
 }
 
-function renderClasses(session) {
-  const items = [];
+function renderClasses() {
+  const out = [];
   if (session.role === "teacher") {
-    session.grades.forEach((g) => {
-      items.push(`<li><strong>${escapeHtml(g)}</strong><p>موادك: ${escapeHtml(session.subjects.join("، "))}</p></li>`);
+    Object.entries(session.assignments).forEach(([g, subs]) => {
+      out.push(`<li><strong>${esc(g)}</strong><p>${esc(subs.join("، "))}</p></li>`);
     });
   } else if (session.role === "student") {
-    items.push(`<li><strong>${escapeHtml(session.grade)}</strong><p>يمكنك الوصول لدردشات صفك ومنشورات المواد.</p></li>`);
+    out.push(`<li><strong>${esc(session.grade)}</strong><p>موادك حسب صفك مع دردشات مخصصة.</p></li>`);
   } else {
-    items.push(`<li><strong>الإدارة</strong><p>مراقبة المنصة وإدارة الانضباط الرقمي.</p></li>`);
+    out.push("<li><strong>الإدارة</strong><p>متابعة كل الصفوف والنشاط.</p></li>");
   }
-  el("classesList").innerHTML = items.join("");
+  el("classesList").innerHTML = out.join("");
 }
 
-function visiblePosts(session) {
+function hydrateTeacherSelectors() {
+  if (session.role !== "teacher") return;
+  const grades = Object.keys(session.assignments);
+  el("postGrade").innerHTML = grades.map((g) => `<option value="${g}">${g}</option>`).join("");
+  el("chatGrade").innerHTML = grades.map((g) => `<option value="${g}">${g}</option>`).join("");
+  updateTeacherSubjectSelectors();
+}
+
+function updateTeacherSubjectSelectors() {
+  if (session.role !== "teacher") return;
+  const pg = el("postGrade").value;
+  const cg = el("chatGrade").value;
+  const pSubs = session.assignments[pg] || [];
+  const cSubs = session.assignments[cg] || [];
+  el("postSubject").innerHTML = pSubs.map((s) => `<option value="${s}">${s}</option>`).join("");
+  el("chatSubject").innerHTML = cSubs.map((s) => `<option value="${s}">${s}</option>`).join("");
+}
+
+function visiblePosts() {
   if (session.role === "admin") return state.data.posts;
-  if (session.role === "teacher") {
-    return state.data.posts.filter((p) => p.audience === "global" || p.authorId === session.id);
-  }
+  if (session.role === "teacher") return state.data.posts.filter((p) => p.audience === "global" || p.authorId === session.id);
   return state.data.posts.filter((p) => p.audience === "global" || p.grade === session.grade);
 }
 
-function renderPosts(session) {
-  const posts = visiblePosts(session);
-  el("postsList").innerHTML = posts.length
-    ? posts
-        .map(
-          (p) =>
-            `<li><strong>${p.audience === "global" ? "إعلان عام" : `${escapeHtml(p.grade)} - ${escapeHtml(p.subject)}`}</strong><p>${escapeHtml(p.body)}</p><small>${escapeHtml(p.authorName)}</small></li>`
-        )
-        .join("")
-    : "<li>لا توجد منشورات حالياً.</li>";
+function renderPosts() {
+  const posts = visiblePosts();
+  el("postList").innerHTML = posts.length ? posts.map((p) => {
+    const title = p.audience === "global" ? "إعلان عام" : `${esc(p.grade)} - ${esc(p.subject)}`;
+    return `<li><strong>${title}</strong><p>${esc(p.text)}</p><small>${esc(p.authorName)}</small></li>`;
+  }).join("") : "<li>لا توجد منشورات.</li>";
 }
 
-function visibleChats(session) {
+function publishTeacherPost() {
+  const grade = el("postGrade").value;
+  const subject = el("postSubject").value;
+  const text = el("postText").value.trim();
+  if (!text) return;
+  if (!session.assignments[grade]?.includes(subject)) return;
+  state.data.posts.unshift({ id: uid("p"), audience: "targeted", authorId: session.id, authorName: session.fullName, grade, subject, text });
+  el("postText").value = "";
+  saveData();
+  renderPosts();
+}
+
+function publishAdminPost() {
+  const text = el("adminPostText").value.trim();
+  if (!text) return;
+  state.data.posts.unshift({ id: uid("p"), audience: "global", authorId: session.id, authorName: `الإدارة - ${session.fullName}`, grade: "all", subject: "all", text });
+  el("adminPostText").value = "";
+  saveData();
+  renderPosts();
+}
+
+function visibleChats() {
   if (session.role === "admin") return state.data.chats;
   if (session.role === "teacher") return state.data.chats.filter((c) => c.ownerId === session.id);
   return state.data.chats.filter((c) => c.grade === session.grade && c.members.some((m) => m.id === session.id));
 }
 
-function renderChats(session) {
-  const chats = visibleChats(session);
-  el("chatList").innerHTML = chats.length
-    ? chats
-        .map(
-          (c) =>
-            `<li><strong>${escapeHtml(c.title)}</strong><p>${escapeHtml(c.grade)} · ${escapeHtml(c.subject)}</p><small>أعضاء: ${escapeHtml(c.members.map((m) => m.fullName).join("، "))}</small></li>`
-        )
-        .join("")
-    : "<li>لا توجد دردشات مطابقة حالياً.</li>";
-}
+function renderChatRooms() {
+  const chats = visibleChats();
+  el("chatRooms").innerHTML = chats.length ? chats.map((c) => `<li><button class="btn openChat" data-id="${c.id}">${esc(c.title)}</button><small>${esc(c.grade)} · ${esc(c.subject)}</small></li>`).join("") : "<li>لا توجد غرف.</li>";
 
-function hydrateTeacherSelectors(session) {
-  if (session.role !== "teacher") return;
-  el("postGrade").innerHTML = session.grades.map((g) => `<option value="${g}">${g}</option>`).join("");
-  el("chatGrade").innerHTML = session.grades.map((g) => `<option value="${g}">${g}</option>`).join("");
-  updateSubjectSelectors(session);
-}
-
-function updateSubjectSelectors(session) {
-  if (session.role !== "teacher") return;
-  const grade = el("postGrade").value || session.grades[0];
-  const grade2 = el("chatGrade").value || session.grades[0];
-
-  const s1 = session.subjects.filter((s) => subjectsForGrades([grade]).includes(s));
-  const s2 = session.subjects.filter((s) => subjectsForGrades([grade2]).includes(s));
-
-  el("postSubject").innerHTML = s1.map((s) => `<option value="${s}">${s}</option>`).join("");
-  el("chatSubject").innerHTML = s2.map((s) => `<option value="${s}">${s}</option>`).join("");
-}
-
-function validateTeacherSelection(grades, subjects) {
-  if (!grades.length) return "اختر صفاً واحداً على الأقل للمعلم.";
-  if (!subjects.length) return "اختر مادة واحدة على الأقل للمعلم.";
-  if (subjects.length > 2) return "يسمح للمعلم باختيار مادتين كحد أقصى.";
-
-  const valid = new Set(subjectsForGrades(grades));
-  if (subjects.some((s) => !valid.has(s))) return "مادة مختارة غير متاحة ضمن الصفوف المختارة.";
-  return "";
-}
-
-function getOrCreateStudent(name, id, grade) {
-  let user = accounts.find((a) => a.id === id || a.fullName === name);
-  if (user && user.role !== "student") return null;
-  if (!user) {
-    user = { id: id || `ST${Math.floor(Math.random() * 9000 + 1000)}`, fullName: name, role: "student", grade };
-    accounts.push(user);
+  if (!state.selectedChatId || !chats.some((c) => c.id === state.selectedChatId)) {
+    state.selectedChatId = chats[0]?.id || null;
   }
-  user.grade = grade;
-  return user;
+  renderConversation();
 }
 
-function publishTeacherPost(session) {
-  const grade = el("postGrade").value;
-  const subject = el("postSubject").value;
-  const body = el("postBody").value.trim();
-  if (!body) return;
-  if (!canTeacherTarget(session, grade, subject)) return;
-
-  state.data.posts.unshift({
-    id: crypto.randomUUID(),
-    authorId: session.id,
-    authorName: session.fullName,
-    audience: "targeted",
-    grade,
-    subject,
-    body,
-  });
-  el("postBody").value = "";
-  saveData();
-  renderPosts(session);
+function renderConversation() {
+  const box = el("chatConversation");
+  const chat = state.data.chats.find((c) => c.id === state.selectedChatId);
+  if (!chat) {
+    box.classList.add("hidden");
+    return;
+  }
+  box.classList.remove("hidden");
+  el("chatRoomTitle").textContent = `${chat.title} (${chat.grade} - ${chat.subject})`;
+  el("chatMessages").innerHTML = (chat.messages || []).map((m) => `<div class="message-item ${m.senderId === session.id ? "me" : ""}"><strong>${esc(m.senderName)}:</strong> ${esc(m.text)}</div>`).join("") || "<div>ابدأ المحادثة الآن...</div>";
 }
 
-function publishAdminPost(session) {
-  const body = el("adminPostBody").value.trim();
-  if (!body || session.role !== "admin") return;
+function sendChatMessage() {
+  const text = el("chatInput").value.trim();
+  if (!text || !state.selectedChatId) return;
+  const chat = state.data.chats.find((c) => c.id === state.selectedChatId);
+  if (!chat) return;
 
-  state.data.posts.unshift({
-    id: crypto.randomUUID(),
-    authorId: session.id,
-    authorName: `الإدارة - ${session.fullName}`,
-    audience: "global",
-    grade: "all",
-    subject: "all",
-    body,
-  });
-  el("adminPostBody").value = "";
+  const allowed = session.role === "admin" || chat.ownerId === session.id || chat.members.some((m) => m.id === session.id);
+  if (!allowed) return;
+
+  chat.messages = chat.messages || [];
+  chat.messages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
+  el("chatInput").value = "";
   saveData();
-  renderPosts(session);
+  renderConversation();
+}
+
+function searchMembers() {
+  const q = el("memberSearch").value.trim().toLowerCase();
+  const grade = el("chatGrade").value;
+  if (!q) return;
+  const results = accounts.filter((a) => a.role === "student" && a.grade === grade && (a.fullName.toLowerCase().includes(q) || a.id.toLowerCase().includes(q)));
+  el("searchResult").innerHTML = results.length ? results.map((a) => `<li>${esc(a.fullName)} (${esc(a.id)}) <button class="btn addMember" data-id="${esc(a.id)}">إضافة</button></li>`).join("") : "<li>لا نتائج</li>";
 }
 
 function renderSelectedMembers() {
-  el("selectedMembers").innerHTML = state.selectedMembers.length
-    ? state.selectedMembers
-        .map((m) => `<li>${escapeHtml(m.fullName)} (${escapeHtml(m.id)}) <button class="btn remove" data-id="${escapeHtml(m.id)}">إزالة</button></li>`)
-        .join("")
-    : "<li>لا يوجد أعضاء مضافون.</li>";
+  el("selectedMembers").innerHTML = state.selectedMembers.length ? state.selectedMembers.map((m) => `<li>${esc(m.fullName)} (${esc(m.id)}) <button class="btn removeMember" data-id="${esc(m.id)}">حذف</button></li>`).join("") : "<li>لا يوجد أعضاء مضافون.</li>";
 }
 
-function searchAccounts(session) {
-  const q = el("accountSearch").value.trim().toLowerCase();
-  if (!q) return;
-  const g = el("chatGrade").value;
-  const list = accounts.filter(
-    (a) =>
-      a.role === "student" &&
-      a.grade === g &&
-      (a.fullName.toLowerCase().includes(q) || a.id.toLowerCase().includes(q))
-  );
-
-  el("searchResults").innerHTML = list.length
-    ? list
-        .map((a) => `<li>${escapeHtml(a.fullName)} (${escapeHtml(a.id)}) <button class="btn add" data-id="${escapeHtml(a.id)}">إضافة</button></li>`)
-        .join("")
-    : "<li>لا نتائج.</li>";
-
-  renderChats(session);
-}
-
-function createChat(session) {
+function createChat() {
   const title = el("chatTitle").value.trim();
   const grade = el("chatGrade").value;
   const subject = el("chatSubject").value;
-
-  if (!title || !subject || !grade || !canTeacherTarget(session, grade, subject)) return;
-  if (!state.selectedMembers.length) return;
+  if (!title || !grade || !subject || !state.selectedMembers.length) return;
+  if (!session.assignments[grade]?.includes(subject)) return;
 
   const owner = { id: session.id, fullName: session.fullName };
-  state.data.chats.unshift({
-    id: crypto.randomUUID(),
-    ownerId: session.id,
-    title,
-    grade,
-    subject,
-    members: [owner, ...state.selectedMembers],
-  });
-
+  const chat = { id: uid("c"), ownerId: session.id, title, grade, subject, members: [owner, ...state.selectedMembers], messages: [] };
+  state.data.chats.unshift(chat);
   state.selectedMembers = [];
   el("chatTitle").value = "";
-  el("searchResults").innerHTML = "";
+  el("searchResult").innerHTML = "";
   saveData();
   renderSelectedMembers();
-  renderChats(session);
+  renderChatRooms();
 }
 
-function aiReply(session, text) {
-  if (session.role === "teacher") return `خطة مقترحة: بداية تفاعلية 7 دقائق، نشاط جماعي 15 دقيقة، تقييم ختامي مرتبط بسؤالك: ${text}`;
-  if (session.role === "admin") return `توصية إدارية: راقب مؤشرات المشاركة الأسبوعية واربطها بخطة دعم للصفوف الأقل نشاطاً. (${text})`;
-  return `مذاكرة ذكية: 25 دقيقة تركيز + 5 دقائق مراجعة، وكرر 3 مرات لسؤالك: ${text}`;
+async function askChatGPT() {
+  const prompt = el("aiPrompt").value.trim();
+  if (!prompt) return;
+
+  const key = el("openaiKey").value.trim();
+  if (key) localStorage.setItem("openai_api_key", key);
+
+  if (!key) {
+    el("aiAnswer").textContent = "ضع OpenAI API Key ليعمل ChatGPT بشكل مباشر. (حالياً رد تجريبي)";
+    return;
+  }
+
+  el("aiAnswer").textContent = "جاري التفكير...";
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: "أنت مساعد تعليمي لمنصة مدرسية عربية." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.4,
+      }),
+    });
+
+    const data = await res.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!res.ok || !content) throw new Error(data?.error?.message || "AI request failed");
+    el("aiAnswer").textContent = content;
+  } catch (err) {
+    el("aiAnswer").textContent = `تعذر الاتصال بـ ChatGPT: ${err.message}`;
+  }
 }
 
-let currentSession = null;
+function getOrCreateStudent(fullName, id, grade) {
+  let s = accounts.find((a) => (id && a.id === id) || a.fullName === fullName);
+  if (s && s.role !== "student") return null;
+  if (!s) {
+    s = { id: id || `ST${Math.floor(Math.random() * 9000 + 1000)}`, fullName, role: "student", grade };
+    accounts.push(s);
+  }
+  s.grade = grade;
+  return s;
+}
+
+roleTabs.forEach((btn) => btn.addEventListener("click", () => { el("loginMsg").textContent = ""; setRole(btn.dataset.role); }));
 
 document.addEventListener("change", (e) => {
-  if (e.target.name === "teacherGrade") renderTeacherSubjects();
-  if (currentSession?.role === "teacher" && (e.target.id === "postGrade" || e.target.id === "chatGrade")) updateSubjectSelectors(currentSession);
+  if (e.target.classList.contains("gradePick")) renderPerGradeSubjects();
 
-  if (e.target.name === "teacherSubject") {
-    const checked = [...document.querySelectorAll('input[name="teacherSubject"]:checked')];
+  if (e.target.classList.contains("subjectPick")) {
+    const grade = e.target.dataset.grade;
+    const checked = [...document.querySelectorAll(`.subjectPick[data-grade="${grade}"]:checked`)];
     if (checked.length > 2) {
       e.target.checked = false;
-      el("loginMessage").textContent = "حد المواد للمعلم هو مادتان فقط.";
+      el("loginMsg").textContent = `حد المواد لصف ${grade} هو مادتان فقط.`;
     }
+
+    const holder = el("perGradeSubjects");
+    const map = collectTeacherAssignments();
+    holder.dataset.selection = JSON.stringify(map);
   }
+
+  if (session?.role === "teacher" && (e.target.id === "postGrade" || e.target.id === "chatGrade")) updateTeacherSubjectSelectors();
 });
 
 document.addEventListener("click", (e) => {
-  if (e.target.matches(".add")) {
-    const user = accounts.find((a) => a.id === e.target.dataset.id);
-    if (user && !state.selectedMembers.some((m) => m.id === user.id)) {
-      state.selectedMembers.push({ id: user.id, fullName: user.fullName });
+  if (e.target.matches(".addMember")) {
+    const id = e.target.dataset.id;
+    const acc = accounts.find((a) => a.id === id);
+    if (acc && !state.selectedMembers.some((m) => m.id === id)) {
+      state.selectedMembers.push({ id: acc.id, fullName: acc.fullName });
       renderSelectedMembers();
     }
   }
 
-  if (e.target.matches(".remove")) {
+  if (e.target.matches(".removeMember")) {
     state.selectedMembers = state.selectedMembers.filter((m) => m.id !== e.target.dataset.id);
     renderSelectedMembers();
   }
-});
 
-roleButtons.forEach((btn) => btn.addEventListener("click", () => setRole(btn.dataset.role)));
+  if (e.target.matches(".openChat")) {
+    state.selectedChatId = e.target.dataset.id;
+    renderConversation();
+  }
+});
 
 el("loginForm").addEventListener("submit", (ev) => {
   ev.preventDefault();
-  el("loginMessage").textContent = "";
+  el("loginMsg").textContent = "";
 
   const fullName = el("fullName").value.trim();
   const password = el("password").value.trim();
-
-  if (!fullName || !password) {
-    el("loginMessage").textContent = "أكمل الحقول المطلوبة.";
-    return;
-  }
-
-  if (password.length < 6) {
-    el("loginMessage").textContent = "كلمة المرور يجب أن تكون 6 أحرف/أرقام على الأقل.";
-    return;
-  }
+  if (!fullName || !password) return (el("loginMsg").textContent = "أكمل الحقول المطلوبة.");
+  if (password.length < 6) return (el("loginMsg").textContent = "كلمة المرور يجب أن تكون 6 أحرف/أرقام على الأقل.");
 
   if (state.role === "student") {
-    const id = el("userId").value.trim();
     const grade = el("studentGrade").value;
-    const student = getOrCreateStudent(fullName, id, grade);
-    if (!student) {
-      el("loginMessage").textContent = "تعارض في بيانات الحساب.";
-      return;
-    }
-    currentSession = { ...student };
-    saveSession(currentSession, el("rememberStudent").checked);
+    const student = getOrCreateStudent(fullName, el("studentId").value.trim(), grade);
+    if (!student) return (el("loginMsg").textContent = "تعارض في بيانات الحساب.");
+    session = { ...student };
   }
 
   if (state.role === "teacher") {
-    const teacherCode = el("teacherCode").value.trim();
-    const email = el("email").value.trim();
-    const { grades, subjects } = readTeacherProfile();
-    const error = validateTeacherSelection(grades, subjects);
+    if (el("teacherSecret").value.trim() !== TEACHER_SECRET) return (el("loginMsg").textContent = "الرقم السري للمعلم غير صحيح.");
+    const email = el("teacherEmail").value.trim();
+    if (!email) return (el("loginMsg").textContent = "بريد المعلم مطلوب.");
 
-    if (!email) {
-      el("loginMessage").textContent = "بريد المعلم مطلوب.";
-      return;
-    }
-    if (teacherCode !== TEACHER_SECRET) {
-      el("loginMessage").textContent = "الرقم السري للمعلم غير صحيح.";
-      return;
-    }
-    if (error) {
-      el("loginMessage").textContent = error;
-      return;
-    }
+    const assignments = collectTeacherAssignments();
+    const err = validateTeacherAssignments(assignments);
+    if (err) return (el("loginMsg").textContent = err);
 
-    currentSession = {
-      id: `TC-${email.toLowerCase()}`,
-      fullName,
-      role: "teacher",
-      email,
-      grades,
-      subjects,
-    };
-    saveSession(currentSession, false);
+    session = { id: `TC-${email.toLowerCase()}`, fullName, role: "teacher", email, assignments };
   }
 
   if (state.role === "admin") {
-    if (fullName !== ADMIN_NAME) {
-      el("loginMessage").textContent = "اسم حساب الإدارة غير صحيح.";
-      return;
-    }
-    if (el("adminCode").value.trim() !== ADMIN_SECRET) {
-      el("loginMessage").textContent = "الرقم السري للإدارة غير صحيح.";
-      return;
-    }
-
-    currentSession = { id: "ADMIN-1", fullName, role: "admin" };
-    saveSession(currentSession, false);
+    if (fullName !== ADMIN_NAME) return (el("loginMsg").textContent = "اسم الإدارة يجب أن يكون: ادارة المدرسة");
+    if (el("adminSecret").value.trim() !== ADMIN_SECRET) return (el("loginMsg").textContent = "الرقم السري للإدارة غير صحيح.");
+    session = { id: "ADMIN-1", fullName, role: "admin" };
   }
 
-  renderDashboard(currentSession);
-});
-
-el("publishPost").addEventListener("click", () => currentSession && publishTeacherPost(currentSession));
-el("publishAdminPost").addEventListener("click", () => currentSession && publishAdminPost(currentSession));
-el("searchAccount").addEventListener("click", () => currentSession && searchAccounts(currentSession));
-el("createChat").addEventListener("click", () => currentSession && createChat(currentSession));
-
-el("askAi").addEventListener("click", () => {
-  if (!currentSession) return;
-  const text = el("aiPrompt").value.trim();
-  if (!text) return;
-  el("aiAnswer").textContent = aiReply(currentSession, text);
+  saveSession(session); // حفظ تسجيل الدخول للكل
+  renderDashboard();
 });
 
 el("logoutBtn").addEventListener("click", () => {
   clearSession();
-  currentSession = null;
+  session = null;
   state.selectedMembers = [];
+  state.selectedChatId = null;
   el("dashboard").classList.add("hidden");
   el("loginScreen").classList.remove("hidden");
   el("loginForm").reset();
-  renderSelectedMembers();
+  renderTeacherAssignmentPicker();
   setRole("student");
 });
 
-renderLoginOptions();
+el("publishTeacherPost").addEventListener("click", publishTeacherPost);
+el("publishAdminPost").addEventListener("click", publishAdminPost);
+el("doSearch").addEventListener("click", searchMembers);
+el("createChat").addEventListener("click", createChat);
+el("sendMessage").addEventListener("click", sendChatMessage);
+el("askAi").addEventListener("click", askChatGPT);
+
+renderLoginSetup();
 renderSelectedMembers();
 setRole("student");
 
-const saved = loadSession();
-if (saved) {
-  currentSession = saved;
-  renderDashboard(saved);
-}
+if (session) renderDashboard();

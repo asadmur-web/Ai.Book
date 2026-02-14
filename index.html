@@ -3,157 +3,139 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Book | البيئة المدرسية الذكية</title>
+    <title>AI Book | منصة تعليمية ذكية</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div class="bg"></div>
-    <main class="container">
-      <section class="card" id="loginScreen">
-        <div class="hero">
-          <span class="pill">AI Book</span>
-          <h1>منصة مدرسية متكاملة للطلاب والمعلمين والإدارة</h1>
+    <div class="bg-orb"></div>
+    <main class="app">
+      <section id="loginScreen" class="card login-layout">
+        <aside class="intro">
+          <span class="logo-pill">AI Book</span>
+          <h1>منصة مدرسية تفاعلية شاملة</h1>
           <p>
-            تجمع تعاون الفصول، مجتمع المنشورات، إدارة أكاديمية، ودعم ذكي داخل تجربة
-            واحدة آمنة وسهلة.
+            فصول، منشورات، دردشات مباشرة، وإدارة مدرسية مع مساعد ذكي متكامل.
           </p>
-        </div>
+        </aside>
 
-        <div class="auth-box">
+        <section class="auth">
           <h2>تسجيل الدخول</h2>
           <div class="tabs">
             <button class="tab active" data-role="student">طالب</button>
             <button class="tab" data-role="teacher">معلم</button>
-            <button class="tab" data-role="admin">إدارة مدرسية</button>
+            <button class="tab" data-role="admin">إدارة</button>
           </div>
 
           <form id="loginForm" class="form">
-            <label>
-              الاسم الكامل
+            <label>الاسم الكامل
               <input id="fullName" type="text" required placeholder="الاسم الرباعي" />
             </label>
 
-            <label id="idField">
-              رقم الطالب / ID
-              <input id="userId" type="text" placeholder="مثال: ST1001" />
+            <label id="studentIdWrap">ID الطالب
+              <input id="studentId" type="text" placeholder="مثال ST1234" />
             </label>
 
-            <label id="emailField" class="hidden">
-              البريد الإلكتروني
-              <input id="email" type="email" placeholder="teacher@school.edu" />
-            </label>
-
-            <label id="studentGradeField">
-              الصف
+            <label id="studentGradeWrap">الصف
               <select id="studentGrade"></select>
             </label>
 
-            <label>
-              كلمة المرور
+            <label id="teacherEmailWrap" class="hidden">بريد المعلم
+              <input id="teacherEmail" type="email" placeholder="teacher@school.edu" />
+            </label>
+
+            <label>كلمة المرور
               <input id="password" type="password" required placeholder="••••••••" />
             </label>
 
-            <label id="teacherCodeField" class="hidden">
-              الرقم السري للمعلم
-              <input id="teacherCode" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" />
+            <label id="teacherSecretWrap" class="hidden">الرقم السري للمعلم
+              <input id="teacherSecret" type="password" maxlength="6" inputmode="numeric" placeholder="••••••" />
             </label>
 
-            <fieldset id="teacherGradesField" class="hidden">
-              <legend>اختر الصفوف التي تدرّسها (السادس - العاشر)</legend>
-              <div id="teacherGrades" class="checks"></div>
-            </fieldset>
+            <div id="teacherAssignments" class="hidden"></div>
 
-            <fieldset id="teacherSubjectsField" class="hidden">
-              <legend>اختر المواد (حد أقصى مادتين)</legend>
-              <div id="teacherSubjects" class="checks"></div>
-            </fieldset>
-
-            <label id="adminCodeField" class="hidden">
-              الرقم السري للإدارة
-              <input id="adminCode" type="password" inputmode="numeric" maxlength="7" placeholder="•••••••" />
+            <label id="adminSecretWrap" class="hidden">الرقم السري للإدارة
+              <input id="adminSecret" type="password" maxlength="7" inputmode="numeric" placeholder="•••••••" />
             </label>
 
-            <label class="remember" id="rememberField">
-              <input type="checkbox" id="rememberStudent" />
-              حفظ تسجيل دخول الطالب
-            </label>
-
-            <button class="btn primary" type="submit">دخول</button>
-            <p id="loginMessage" class="msg"></p>
+            <button class="btn primary" type="submit">دخول المنصة</button>
+            <p id="loginMsg" class="msg"></p>
           </form>
-        </div>
+        </section>
       </section>
 
-      <section id="dashboard" class="hidden card dashboard">
-        <header class="top">
+      <section id="dashboard" class="hidden card">
+        <header class="topbar">
           <div>
             <h2 id="welcome"></h2>
             <p id="subtitle"></p>
           </div>
-          <div class="row">
-            <button id="logoutBtn" class="btn danger">تسجيل الخروج</button>
-          </div>
+          <button id="logoutBtn" class="btn danger">تسجيل خروج</button>
         </header>
 
         <div class="grid">
           <section class="panel">
-            <h3>الفصول والاجتماعات</h3>
+            <h3>الفصول والمواد</h3>
             <ul id="classesList" class="list"></ul>
           </section>
 
           <section class="panel">
-            <h3>منشورات الصفوف</h3>
-            <div id="teacherPostComposer" class="hidden composer">
-              <label>
-                أرسل للصف
+            <h3>المنشورات</h3>
+            <div id="teacherPostBox" class="hidden compose">
+              <label>الصف
                 <select id="postGrade"></select>
               </label>
-              <label>
-                المادة
+              <label>المادة
                 <select id="postSubject"></select>
               </label>
-              <textarea id="postBody" placeholder="اكتب منشوراً للطلاب..."></textarea>
-              <button id="publishPost" class="btn primary" type="button">نشر</button>
+              <textarea id="postText" placeholder="اكتب منشوراً للطلاب..."></textarea>
+              <button id="publishTeacherPost" class="btn primary" type="button">نشر</button>
             </div>
-            <div id="adminPostComposer" class="hidden composer">
-              <label>
-                منشور الإدارة العام
-                <textarea id="adminPostBody" placeholder="اكتب إعلاناً عاماً يراه جميع مستخدمي AI Book..."></textarea>
-              </label>
-              <button id="publishAdminPost" class="btn primary" type="button">نشر للجميع</button>
+
+            <div id="adminPostBox" class="hidden compose">
+              <textarea id="adminPostText" placeholder="منشور عام يراه الجميع..."></textarea>
+              <button id="publishAdminPost" class="btn primary" type="button">نشر عام</button>
             </div>
-            <ul id="postsList" class="list"></ul>
+
+            <ul id="postList" class="list"></ul>
           </section>
 
           <section class="panel">
-            <h3>الدردشات الصفية</h3>
-            <div id="teacherChatTools" class="hidden">
-              <div class="composer">
-                <input id="chatTitle" type="text" placeholder="اسم الدردشة" />
-                <label>
-                  صف الدردشة
-                  <select id="chatGrade"></select>
-                </label>
-                <label>
-                  مادة الدردشة
-                  <select id="chatSubject"></select>
-                </label>
-                <div class="search-row">
-                  <input id="accountSearch" type="text" placeholder="ابحث بالاسم الرباعي أو ID" />
-                  <button id="searchAccount" class="btn" type="button">بحث</button>
+            <h3>الدردشات</h3>
+            <div id="teacherChatTools" class="hidden compose">
+              <input id="chatTitle" type="text" placeholder="اسم غرفة الدردشة" />
+              <label>الصف
+                <select id="chatGrade"></select>
+              </label>
+              <label>المادة
+                <select id="chatSubject"></select>
+              </label>
+              <div class="row">
+                <input id="memberSearch" type="text" placeholder="بحث بالاسم الرباعي أو ID" />
+                <button id="doSearch" class="btn" type="button">بحث</button>
+              </div>
+              <ul id="searchResult" class="mini"></ul>
+              <p>المشاركون:</p>
+              <ul id="selectedMembers" class="mini"></ul>
+              <button id="createChat" class="btn primary" type="button">إنشاء الغرفة</button>
+            </div>
+
+            <div class="chat-layout">
+              <ul id="chatRooms" class="mini"></ul>
+              <div id="chatConversation" class="conversation hidden">
+                <h4 id="chatRoomTitle"></h4>
+                <div id="chatMessages" class="messages"></div>
+                <div class="row">
+                  <input id="chatInput" type="text" placeholder="اكتب رسالة..." />
+                  <button id="sendMessage" class="btn primary" type="button">إرسال</button>
                 </div>
-                <ul id="searchResults" class="mini-list"></ul>
-                <p>المشاركون:</p>
-                <ul id="selectedMembers" class="mini-list"></ul>
-                <button id="createChat" class="btn primary" type="button">إنشاء الدردشة</button>
               </div>
             </div>
-            <ul id="chatList" class="list"></ul>
           </section>
 
           <section class="panel">
-            <h3>المساعد الذكي</h3>
-            <div class="composer">
+            <h3>المساعد الذكي (ChatGPT)</h3>
+            <div class="compose">
+              <input id="openaiKey" type="password" placeholder="OpenAI API Key (اختياري للحفظ محلياً)" />
               <input id="aiPrompt" type="text" placeholder="اكتب سؤالك..." />
               <button id="askAi" class="btn primary" type="button">اسأل</button>
             </div>
