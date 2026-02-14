@@ -15,34 +15,43 @@
           <h1>منصة مدرسية تفاعلية شاملة</h1>
           <p>فصول، منشورات، دردشات مباشرة، وإدارة مدرسية مع مساعد ذكي متكامل.</p>
           <ul class="rules">
-            <li>ID الطالب: حرفان + 4 أرقام فقط (مثال: ST1234).</li>
+            <li>ID: حرفان كابتل + 4 أرقام فقط (مثال ST1234).</li>
             <li>كلمة المرور: 7 خانات على الأقل وتحتوي أحرف + أرقام.</li>
           </ul>
         </aside>
 
         <section class="auth">
-          <h2>تسجيل الدخول</h2>
+          <h2>الحسابات</h2>
           <div class="tabs">
             <button class="tab active" data-role="student">طالب</button>
             <button class="tab" data-role="teacher">معلم</button>
             <button class="tab" data-role="admin">الإدارة المدرسية</button>
           </div>
 
+          <div class="tabs mode-tabs">
+            <button class="tab active" data-mode="register" id="modeRegister">تسجيل جديد</button>
+            <button class="tab" data-mode="login" id="modeLogin">مسجل دخول</button>
+          </div>
+
           <form id="loginForm" class="form">
-            <label>الاسم الكامل
-              <input id="fullName" type="text" required placeholder="الاسم الرباعي" />
+            <label id="identifierWrap" class="hidden">البريد الإلكتروني أو ID
+              <input id="identifier" type="text" placeholder="مثال: teacher@school.edu أو ST1234" />
             </label>
 
-            <label id="studentIdWrap">ID الطالب
-              <input id="studentId" type="text" placeholder="ST1234" />
+            <label id="fullNameWrap">الاسم الكامل
+              <input id="fullName" type="text" placeholder="الاسم الرباعي" />
+            </label>
+
+            <label id="commonIdWrap">ID الحساب
+              <input id="accountId" type="text" placeholder="ST1234" />
             </label>
 
             <label id="studentGradeWrap">الصف
               <select id="studentGrade"></select>
             </label>
 
-            <label id="teacherEmailWrap" class="hidden">بريد المعلم
-              <input id="teacherEmail" type="email" placeholder="teacher@school.edu" />
+            <label id="emailWrap">البريد الإلكتروني
+              <input id="email" type="email" placeholder="name@school.edu" />
             </label>
 
             <label>كلمة المرور
@@ -80,7 +89,10 @@
             <h2 id="welcome"></h2>
             <p id="subtitle"></p>
           </div>
-          <button id="logoutBtn" class="btn danger">تسجيل خروج</button>
+          <div class="row">
+            <button id="deleteMyAccount" class="btn">حذف حسابي</button>
+            <button id="logoutBtn" class="btn danger">تسجيل خروج</button>
+          </div>
         </header>
 
         <div class="grid">
@@ -111,7 +123,19 @@
           </section>
 
           <section class="panel">
-            <h3>الدردشات</h3>
+            <h3>دردشة الطاقم المدرسي</h3>
+            <div id="staffChatBox" class="hidden">
+              <div id="staffMessages" class="messages"></div>
+              <div class="row">
+                <input id="staffInput" type="text" placeholder="رسالة للطاقم..." />
+                <button id="sendStaffMessage" class="btn primary" type="button">إرسال</button>
+              </div>
+            </div>
+            <p id="staffChatHint">هذه الدردشة مخصصة للمعلمين والإدارة فقط.</p>
+          </section>
+
+          <section class="panel">
+            <h3>الدردشات الصفية</h3>
             <div id="teacherChatTools" class="hidden compose">
               <input id="chatTitle" type="text" placeholder="اسم غرفة الدردشة" />
               <label>الصف
@@ -141,6 +165,16 @@
                 </div>
               </div>
             </div>
+          </section>
+
+          <section class="panel" id="adminManagePanel">
+            <h3>إدارة الحسابات (للمدير ونائب المدير)</h3>
+            <div id="adminDeleteTools" class="hidden compose">
+              <input id="deleteSearch" type="text" placeholder="ابحث بالاسم أو ID أو البريد" />
+              <button id="searchDeleteTarget" class="btn" type="button">بحث</button>
+              <ul id="deleteResults" class="mini"></ul>
+            </div>
+            <p id="adminDeleteHint">غير متاح إلا للمدير ونائب المدير.</p>
           </section>
 
           <section class="panel">

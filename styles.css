@@ -67,3 +67,7 @@ textarea { min-height:85px; }
 .btn { transition: transform .15s ease, opacity .2s; }
 .btn:hover { transform: translateY(-1px); opacity:.95; }
 .messages { scroll-behavior:smooth; }
+
+.mode-tabs { margin-top:.5rem; }
+#staffChatHint,#adminDeleteHint { color: var(--muted); }
+#identifierWrap input { direction:ltr; }
