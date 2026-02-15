@@ -20,6 +20,7 @@
           <ul>
             <li>ID: حرفان إنجليزي كابتل + 4 أرقام (مثال ST1234)</li>
             <li>كلمة المرور: 7 خانات على الأقل (أحرف + أرقام)</li>
+            <li>الطالب يحتاج الرمز السري 20301 عند التسجيل</li>
           </ul>
         </aside>
 
@@ -60,6 +61,10 @@
 
             <label>كلمة المرور
               <input id="password" type="password" required placeholder="••••••••" />
+            </label>
+
+            <label id="studentSecretWrap" class="hidden">الرمز السري للطالب
+              <input id="studentSecret" type="password" maxlength="5" inputmode="numeric" placeholder="•••••" />
             </label>
 
             <label id="teacherSecretWrap" class="hidden">الرقم السري للمعلم

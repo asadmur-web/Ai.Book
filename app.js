@@ -1,3 +1,4 @@
+const STUDENT_SECRET = "20301";
 const TEACHER_SECRET = "951951";
 const ADMIN_SECRET = "2512011";
 const ADMIN_BASE_NAME = "الإدارة المدرسية";
@@ -151,6 +152,7 @@ function applyAuthLayout() {
   el("idWrap").classList.toggle("hidden", !reg);
   el("studentGradeWrap").classList.toggle("hidden", !(reg && role === "student"));
   el("emailWrap").classList.toggle("hidden", !reg);
+  el("studentSecretWrap").classList.toggle("hidden", !(reg && role === "student"));
   el("teacherSecretWrap").classList.toggle("hidden", !(reg && role === "teacher"));
   el("teacherAssignments").classList.toggle("hidden", !(reg && role === "teacher"));
   el("adminPositionWrap").classList.toggle("hidden", !(reg && role === "admin"));
@@ -797,6 +799,7 @@ function registerUser() {
   }
 
   if (role === "student") {
+    if (el("studentSecret").value.trim() !== STUDENT_SECRET) return "الرمز السري للطالب غير صحيح.";
     const grade = el("studentGrade").value;
     state.data.users.push({ id, fullName, role: "student", grade, email, password });
     session = { id, fullName, role: "student", grade, email };
