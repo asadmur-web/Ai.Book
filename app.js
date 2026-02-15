@@ -22,6 +22,8 @@ const roleTabs = document.querySelectorAll("#roleTabs .tab");
 const modeTabs = document.querySelectorAll("#modeTabs .tab");
 
 function safeParse(raw, fallback) { try { return JSON.parse(raw); } catch { return fallback; } }
+function asArray(v) { return Array.isArray(v) ? v : []; }
+function asObject(v) { return v && typeof v === "object" && !Array.isArray(v) ? v : {}; }
 function esc(v) {
   return String(v)
     .replaceAll("&", "&amp;")
@@ -67,15 +69,27 @@ const state = {
   data: safeParse(localStorage.getItem("aiBookData") || "{}", {}),
 };
 
-state.data.users = Array.isArray(state.data.users) ? state.data.users : [...seedUsers];
-state.data.posts = Array.isArray(state.data.posts) ? state.data.posts : [];
-state.data.chats = Array.isArray(state.data.chats) ? state.data.chats : [];
-state.data.staffMessages = Array.isArray(state.data.staffMessages) ? state.data.staffMessages : [];
-state.data.teacherAssignmentsByGradeSubject = state.data.teacherAssignmentsByGradeSubject || {};
-state.data.marks = state.data.marks || {}; // key => {daily1,monthExam,daily2,finalExam,qualitative}
-state.data.studentChats = Array.isArray(state.data.studentChats) ? state.data.studentChats : [];
-state.data.directChats = Array.isArray(state.data.directChats) ? state.data.directChats : [];
-state.data.settings = state.data.settings || { theme: "theme-green", iconShape: "icons-rounded" };
+state.data.users = asArray(state.data.users).filter((u) => u && u.id && u.role) || [...seedUsers];
+state.data.posts = asArray(state.data.posts).filter((p) => p && p.authorId && p.text);
+state.data.chats = asArray(state.data.chats).map((c) => ({
+  ...c,
+  members: asArray(c.members),
+  messages: asArray(c.messages),
+})).filter((c) => c && c.id && c.title);
+state.data.staffMessages = asArray(state.data.staffMessages);
+state.data.teacherAssignmentsByGradeSubject = asObject(state.data.teacherAssignmentsByGradeSubject);
+state.data.marks = asObject(state.data.marks); // key => {daily1,monthExam,daily2,finalExam,qualitative}
+state.data.studentChats = asArray(state.data.studentChats).map((c) => ({
+  ...c,
+  members: asArray(c.members),
+  messages: asArray(c.messages),
+})).filter((c) => c && c.id && c.title);
+state.data.directChats = asArray(state.data.directChats).map((c) => ({
+  ...c,
+  members: asArray(c.members),
+  messages: asArray(c.messages),
+})).filter((c) => c && c.id && c.title);
+state.data.settings = { theme: "theme-green", iconShape: "icons-rounded", ...asObject(state.data.settings) };
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
@@ -84,7 +98,7 @@ function saveSession(s) { localStorage.setItem("aiBookSession", JSON.stringify(s
 function clearSession() { localStorage.removeItem("aiBookSession"); }
 
 function applyTheme(theme) {
-  const chosen = theme || "theme-blue";
+  const chosen = theme || "theme-green";
   document.body.classList.remove("theme-blue", "theme-green", "theme-purple", "theme-sunset");
   document.body.classList.add(chosen);
   state.data.settings.theme = chosen;
@@ -756,10 +770,26 @@ function removeAccount(id) {
   state.data.users = state.data.users.filter((u) => u.id !== id);
   state.data.posts = state.data.posts.filter((p) => p.authorId !== id);
   state.data.staffMessages = state.data.staffMessages.filter((m) => m.senderId !== id);
-  state.data.chats = state.data.chats.filter((c) => c.ownerId !== id).map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
-  state.data.studentChats = state.data.studentChats.filter((c) => c.ownerId !== id).map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
+  state.data.chats = state.data.chats
+    .filter((c) => c.ownerId !== id)
+    .map((c) => ({
+      ...c,
+      members: c.members.filter((m) => m.id !== id),
+      messages: asArray(c.messages).filter((m) => m.senderId !== id),
+    }))
+    .filter((c) => c.members.length > 1);
+
+  state.data.studentChats = state.data.studentChats
+    .filter((c) => c.ownerId !== id)
+    .map((c) => ({
+      ...c,
+      members: c.members.filter((m) => m.id !== id),
+      messages: asArray(c.messages).filter((m) => m.senderId !== id),
+    }))
+    .filter((c) => c.members.length > 1);
+
   state.data.directChats = state.data.directChats
-    .map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id), messages: c.messages.filter((m) => m.senderId !== id) }))
+    .map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id), messages: asArray(c.messages).filter((m) => m.senderId !== id) }))
     .filter((c) => c.members.length >= 2);
   Object.keys(state.data.marks).forEach((k) => { if (k.startsWith(`${id}|`)) delete state.data.marks[k]; });
   saveData();
