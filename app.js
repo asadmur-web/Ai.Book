@@ -1,4 +1,4 @@
-const STUDENT_SECRET = "20301";
+const STUDENT_SECRET = "30201";
 const TEACHER_SECRET = "951951";
 const ADMIN_SECRET = "2512011";
 const ADMIN_BASE_NAME = "الإدارة المدرسية";
