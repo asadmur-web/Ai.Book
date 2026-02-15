@@ -14,12 +14,7 @@ const baseSubjects = [
 ];
 const grade10Subjects = baseSubjects.filter((s) => s !== "العلوم").concat(["فيزياء", "كيمياء", "احياء"]);
 
-const seedUsers = [
-  { id: "ST1001", fullName: "خالد أحمد يوسف علي", role: "student", grade: "السادس", email: "st1001@school.edu", password: "Abc1234" },
-  { id: "ST1002", fullName: "محمد سامي فهد حسن", role: "student", grade: "السابع", email: "st1002@school.edu", password: "Abc1234" },
-  { id: "ST1003", fullName: "ليان عمر حمد سليمان", role: "student", grade: "الثامن", email: "st1003@school.edu", password: "Abc1234" },
-  { id: "ST1004", fullName: "سارة أنس محمود عبد الله", role: "student", grade: "التاسع", email: "st1004@school.edu", password: "Abc1234" },
-];
+const seedUsers = [];
 
 const el = (id) => document.getElementById(id);
 const roleTabs = document.querySelectorAll("#roleTabs .tab");
@@ -66,6 +61,7 @@ const state = {
   selectedChatId: null,
   selectedStudentChatId: null,
   selectedStudentMembers: [],
+  selectedDirectChatId: null,
   currentQuestion: null,
   data: safeParse(localStorage.getItem("aiBookData") || "{}", {}),
 };
@@ -77,7 +73,8 @@ state.data.staffMessages = Array.isArray(state.data.staffMessages) ? state.data.
 state.data.teacherAssignmentsByGradeSubject = state.data.teacherAssignmentsByGradeSubject || {};
 state.data.marks = state.data.marks || {}; // key => {daily1,monthExam,daily2,finalExam,qualitative}
 state.data.studentChats = Array.isArray(state.data.studentChats) ? state.data.studentChats : [];
-state.data.settings = state.data.settings || { theme: "theme-blue", iconShape: "icons-rounded" };
+state.data.directChats = Array.isArray(state.data.directChats) ? state.data.directChats : [];
+state.data.settings = state.data.settings || { theme: "theme-green", iconShape: "icons-rounded" };
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
@@ -104,6 +101,35 @@ function applyIconShape(shape) {
 function isCounselorMonitor() {
   return session?.role === "admin" && session?.position === "مرشد تربوي";
 }
+
+
+function resetDataForPublish() {
+  const flag = "aiBookPublishResetV3";
+  if (localStorage.getItem(flag)) return;
+
+  state.data.users = [];
+  state.data.posts = [];
+  state.data.chats = [];
+  state.data.staffMessages = [];
+  state.data.teacherAssignmentsByGradeSubject = {};
+  state.data.marks = {};
+  state.data.studentChats = [];
+  state.data.directChats = [];
+  clearSession();
+  session = null;
+  localStorage.setItem(flag, "1");
+  saveData();
+}
+
+function ensureSessionStillValid() {
+  if (!session) return;
+  const active = state.data.users.find((u) => u.id === session.id);
+  if (!active) {
+    clearSession();
+    session = null;
+  }
+}
+
 
 function setRole(role) {
   state.role = role;
@@ -133,6 +159,8 @@ function applyAuthLayout() {
 
 function renderLoginSetup() {
   el("studentGrade").innerHTML = gradeNames.map((g) => `<option value="${g}">${g}</option>`).join("");
+  const adminGradeSelect = el("adminPostGrade");
+  if (adminGradeSelect) adminGradeSelect.innerHTML = `<option value="all">جميع الصفوف</option>${gradeNames.map((g) => `<option value="${g}">${g}</option>`).join("")}`;
   renderTeacherAssignmentPicker();
 }
 
@@ -249,14 +277,20 @@ function renderClasses() {
 
 function visiblePosts() {
   if (session.role === "admin") return state.data.posts;
-  if (session.role === "teacher") return state.data.posts.filter((p) => p.audience === "global" || p.authorId === session.id);
-  return state.data.posts.filter((p) => p.audience === "global" || p.grade === session.grade);
+  if (session.role === "teacher") {
+    const myGrades = Object.keys(session.assignments || {});
+    return state.data.posts.filter((p) => p.audience === "global" || p.authorId === session.id || (p.audience === "grade" && myGrades.includes(p.grade)));
+  }
+  return state.data.posts.filter((p) => p.audience === "global" || (p.audience === "grade" && p.grade === session.grade));
 }
 
 function renderPosts() {
   const posts = visiblePosts();
   el("postList").innerHTML = posts.length
-    ? posts.map((p) => `<li><strong>${p.audience === "global" ? "إعلان عام" : `${esc(p.grade)} - ${esc(p.subject)}`}</strong><p>${esc(p.text)}</p><small>${esc(p.authorName)}</small></li>`).join("")
+    ? posts.map((p) => {
+      const title = p.audience === "global" ? "إعلان إداري عام" : p.audience === "grade" ? `إعلان إداري لصف ${esc(p.grade)}` : `${esc(p.grade)} - ${esc(p.subject)}`;
+      return `<li><strong>${title}</strong><p>${esc(p.text)}</p><small>${esc(p.authorName)}</small></li>`;
+    }).join("")
     : "<li>لا توجد منشورات.</li>";
 }
 
@@ -272,9 +306,11 @@ function publishTeacherPost() {
 }
 
 function publishAdminPost() {
+  const grade = el("adminPostGrade").value;
   const text = el("adminPostText").value.trim();
   if (!text) return;
-  state.data.posts.unshift({ id: uid("p"), audience: "global", authorId: session.id, authorName: session.fullName, grade: "all", subject: "all", text });
+  const audience = grade === "all" ? "global" : "grade";
+  state.data.posts.unshift({ id: uid("p"), audience, authorId: session.id, authorName: session.fullName, grade, subject: "إدارة مدرسية", text });
   el("adminPostText").value = "";
   saveData();
   renderPosts();
@@ -630,11 +666,77 @@ function renderQuestionCard() {
 function nextQuestion() {
   state.currentQuestion = generateQuestionCard();
   renderQuestionCard();
+  renderDirectChats();
 }
 
 function showAnswer() {
   if (session?.role !== "student" || !state.currentQuestion) return;
   el("questionAnswer").textContent = `الإجابة: ${state.currentQuestion.a}`;
+}
+
+
+function visibleDirectChats() {
+  if (!session) return [];
+  return state.data.directChats.filter((c) => c.members.some((m) => m.id === session.id));
+}
+
+function renderDirectChats() {
+  const chats = visibleDirectChats();
+  el("directChatRooms").innerHTML = chats.length
+    ? chats.map((c) => `<li><button class="btn openDirectChat" data-id="${c.id}">${esc(c.title)}</button></li>`).join("")
+    : "<li>لا توجد دردشات مباشرة.</li>";
+
+  if (!state.selectedDirectChatId || !chats.some((c) => c.id === state.selectedDirectChatId)) state.selectedDirectChatId = chats[0]?.id || null;
+  renderDirectConversation();
+}
+
+function renderDirectConversation() {
+  const chat = state.data.directChats.find((c) => c.id === state.selectedDirectChatId);
+  if (!chat) return el("directChatConversation").classList.add("hidden");
+  el("directChatConversation").classList.remove("hidden");
+  el("directChatTitle").textContent = chat.title;
+  el("directChatMessages").innerHTML = (chat.messages || []).map((m) => `<div class="message-item ${m.senderId === session.id ? "me" : ""}"><strong>${esc(m.senderName)}:</strong> ${esc(m.text)}</div>`).join("") || "<div>ابدأ الدردشة...</div>";
+}
+
+function searchDirectUsers() {
+  if (session.role !== "admin") return;
+  const q = el("directChatSearch").value.trim().toLowerCase();
+  if (!q) return;
+  const users = state.data.users.filter((u) => u.id !== session.id && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)));
+  el("directSearchResults").innerHTML = users.length
+    ? users.map((u) => `<li>${esc(u.fullName)} (${esc(u.id)}) <button class="btn startDirectChat" data-id="${u.id}">فتح دردشة</button></li>`).join("")
+    : "<li>لا نتائج</li>";
+}
+
+function startDirectChat(targetId) {
+  if (session.role !== "admin") return;
+  const user = state.data.users.find((u) => u.id === targetId);
+  if (!user) return;
+
+  let chat = state.data.directChats.find((c) => c.members.some((m) => m.id === session.id) && c.members.some((m) => m.id === user.id));
+  if (!chat) {
+    chat = {
+      id: uid("d"),
+      title: `${session.fullName} ↔ ${user.fullName}`,
+      members: [{ id: session.id, fullName: session.fullName }, { id: user.id, fullName: user.fullName }],
+      messages: [],
+    };
+    state.data.directChats.unshift(chat);
+  }
+  state.selectedDirectChatId = chat.id;
+  saveData();
+  renderDirectChats();
+}
+
+function sendDirectMessage() {
+  const text = el("directChatInput").value.trim();
+  if (!text || !state.selectedDirectChatId) return;
+  const chat = state.data.directChats.find((c) => c.id === state.selectedDirectChatId);
+  if (!chat || !chat.members.some((m) => m.id === session.id)) return;
+  chat.messages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
+  el("directChatInput").value = "";
+  saveData();
+  renderDirectConversation();
 }
 
 function searchDeleteTargets() {
@@ -654,6 +756,9 @@ function removeAccount(id) {
   state.data.staffMessages = state.data.staffMessages.filter((m) => m.senderId !== id);
   state.data.chats = state.data.chats.filter((c) => c.ownerId !== id).map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
   state.data.studentChats = state.data.studentChats.filter((c) => c.ownerId !== id).map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
+  state.data.directChats = state.data.directChats
+    .map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id), messages: c.messages.filter((m) => m.senderId !== id) }))
+    .filter((c) => c.members.length >= 2);
   Object.keys(state.data.marks).forEach((k) => { if (k.startsWith(`${id}|`)) delete state.data.marks[k]; });
   saveData();
 }
@@ -666,6 +771,7 @@ function deleteMyAccount() {
   state.selectedStudentMembers = [];
   state.selectedChatId = null;
   state.selectedStudentChatId = null;
+  state.selectedDirectChatId = null;
   state.currentQuestion = null;
   el("dashboard").classList.add("hidden");
   el("loginScreen").classList.remove("hidden");
@@ -776,6 +882,10 @@ function renderDashboard() {
   el("adminDeleteTools").classList.toggle("hidden", !canDel);
   el("adminDeleteHint").classList.toggle("hidden", canDel);
 
+  const directVisible = ["admin", "teacher", "student"].includes(session.role);
+  el("directChatPanel").classList.toggle("hidden", !directVisible);
+  el("adminDirectTools").classList.toggle("hidden", session.role !== "admin");
+
   hydrateTeacherSelectors();
   renderClasses();
   renderPosts();
@@ -786,6 +896,7 @@ function renderDashboard() {
   renderStudentChatRooms();
   renderSelectedStudentMembers();
   renderQuestionCard();
+  renderDirectChats();
 }
 
 roleTabs.forEach((b) => b.addEventListener("click", () => { el("authMsg").textContent = ""; setRole(b.dataset.role); }));
@@ -856,6 +967,15 @@ document.addEventListener("click", (e) => {
     applyIconShape(e.target.dataset.iconShape);
   }
 
+  if (e.target.matches(".startDirectChat")) {
+    startDirectChat(e.target.dataset.id);
+  }
+
+  if (e.target.matches(".openDirectChat")) {
+    state.selectedDirectChatId = e.target.dataset.id;
+    renderDirectConversation();
+  }
+
   if (e.target.matches(".deleteUser") && canAdminDelete()) {
     removeAccount(e.target.dataset.id);
     searchDeleteTargets();
@@ -885,6 +1005,8 @@ el("searchStudentMember").addEventListener("click", searchStudentMembers);
 el("createStudentChat").addEventListener("click", createStudentChat);
 el("sendStudentMessage").addEventListener("click", sendStudentChatMessage);
 el("sendStaffMessage").addEventListener("click", sendStaffMessage);
+el("doDirectSearch").addEventListener("click", searchDirectUsers);
+el("sendDirectMessage").addEventListener("click", sendDirectMessage);
 el("searchDeleteTarget").addEventListener("click", searchDeleteTargets);
 el("saveMarks").addEventListener("click", saveTeacherMarks);
 el("nextQuestion").addEventListener("click", nextQuestion);
@@ -898,6 +1020,7 @@ el("logoutBtn").addEventListener("click", () => {
   state.selectedStudentMembers = [];
   state.selectedChatId = null;
   state.selectedStudentChatId = null;
+  state.selectedDirectChatId = null;
   state.currentQuestion = null;
   el("dashboard").classList.add("hidden");
   el("loginScreen").classList.remove("hidden");
@@ -908,12 +1031,14 @@ el("logoutBtn").addEventListener("click", () => {
   setMode("register");
 });
 
+resetDataForPublish();
+ensureSessionStillValid();
 renderLoginSetup();
 renderSelectedMembers();
 renderSelectedStudentMembers();
 setRole("student");
 setMode("register");
-applyTheme(state.data.settings.theme || "theme-blue");
+applyTheme(state.data.settings.theme || "theme-green");
 applyIconShape(state.data.settings.iconShape || "icons-rounded");
 
 if (session) renderDashboard();

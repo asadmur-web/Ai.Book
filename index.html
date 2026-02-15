@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Book | منصة مدرسية متكاملة</title>
+    <title>Smart Sharia Education website | موقع التعليم الشرعي الذكي</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -11,11 +11,11 @@
     <main class="app-wrap">
       <section id="loginScreen" class="glass card login-grid">
         <aside class="hero">
-          <span class="brand">AI Book</span>
-          <h1>منصة مدرسية ذكية بتجربة سلسة</h1>
+          <div class="brand-wrap"><div class="logo-mark" aria-hidden="true"></div><span class="brand">Smart Sharia Education website</span></div>
+          <h1>موقع التعليم الشرعي الذكي</h1>
           <p>
-            إدارة صفوف، منشورات، دردشات، وسجل علامات كامل شبيه eSchool — بواجهة
-            حديثة ومتجاوبة لكل الأجهزة.
+            منصة تعليمية متكاملة لإدارة الصفوف، العلامات، الدردشات، والمتابعة اليومية بواجهة
+            متجاوبة لجميع الأجهزة وبهوية بصرية مستوحاة من الشعار.
           </p>
           <ul>
             <li>ID: حرفان إنجليزي كابتل + 4 أرقام (مثال ST1234)</li>
@@ -130,8 +130,11 @@
               <button id="publishTeacherPost" class="btn primary" type="button">نشر</button>
             </div>
             <div id="adminPostBox" class="hidden compose">
-              <textarea id="adminPostText" placeholder="منشور عام يراه الجميع..."></textarea>
-              <button id="publishAdminPost" class="btn primary" type="button">نشر عام</button>
+              <label>جهة النشر
+                <select id="adminPostGrade"></select>
+              </label>
+              <textarea id="adminPostText" placeholder="منشور إداري للصف المحدد أو لجميع الصفوف..."></textarea>
+              <button id="publishAdminPost" class="btn primary" type="button">نشر إداري</button>
             </div>
             <ul id="postList" class="list"></ul>
           </section>
@@ -208,6 +211,30 @@
               </div>
             </div>
             <p id="studentChatHint" class="muted-note">إنشاء دردشة الطلاب متاح للطلاب فقط، والمراقبة للمرشد التربوي.</p>
+          </section>
+
+
+
+          <section class="panel" id="directChatPanel">
+            <h3>الدردشة المباشرة مع الإدارة</h3>
+            <div id="adminDirectTools" class="hidden compose">
+              <div class="inline-row">
+                <input id="directChatSearch" type="text" placeholder="ابحث باسم أو ID أو بريد" />
+                <button id="doDirectSearch" class="btn" type="button">بحث</button>
+              </div>
+              <ul id="directSearchResults" class="mini"></ul>
+            </div>
+            <div class="chat-grid">
+              <ul id="directChatRooms" class="mini"></ul>
+              <div id="directChatConversation" class="hidden">
+                <h4 id="directChatTitle"></h4>
+                <div id="directChatMessages" class="messages"></div>
+                <div class="inline-row">
+                  <input id="directChatInput" type="text" placeholder="اكتب رسالة مباشرة..." />
+                  <button id="sendDirectMessage" class="btn primary" type="button">إرسال</button>
+                </div>
+              </div>
+            </div>
           </section>
 
           <section class="panel">
