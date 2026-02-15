@@ -210,3 +210,34 @@ textarea { min-height: 88px; }
   .inline-row { flex-direction: column; }
   .topbar { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
 }
+
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(100px, 1fr));
+  gap: 0.45rem;
+}
+
+body.theme-blue {
+  --bg1: #0a1028;
+  --bg2: #1a2b6c;
+  --bg3: #2c6bd8;
+}
+
+body.theme-green {
+  --bg1: #071f16;
+  --bg2: #14683f;
+  --bg3: #2ab86a;
+}
+
+body.theme-purple {
+  --bg1: #1a0933;
+  --bg2: #4a1d87;
+  --bg3: #7f42d8;
+}
+
+body.theme-sunset {
+  --bg1: #2a1209;
+  --bg2: #9b3d1d;
+  --bg3: #ff7b2f;
+}

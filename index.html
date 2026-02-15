@@ -105,6 +105,17 @@
             <ul id="classList" class="list"></ul>
           </section>
 
+          <section class="panel" id="settingsPanel">
+            <h3>الإعدادات</h3>
+            <p class="muted-note">غيّر لون الخلفية حسب راحتك.</p>
+            <div class="theme-grid">
+              <button class="btn theme-btn" data-theme="theme-blue" type="button">أزرق</button>
+              <button class="btn theme-btn" data-theme="theme-green" type="button">أخضر</button>
+              <button class="btn theme-btn" data-theme="theme-purple" type="button">بنفسجي</button>
+              <button class="btn theme-btn" data-theme="theme-sunset" type="button">غروب</button>
+            </div>
+          </section>
+
           <section class="panel">
             <h3>المنشورات</h3>
             <div id="teacherPostBox" class="hidden compose">
@@ -159,6 +170,34 @@
                 </div>
               </div>
             </div>
+          </section>
+
+          <section class="panel" id="studentChatsPanel">
+            <h3>دردشات الطلاب (تحت مراقبة المرشد التربوي)</h3>
+            <div id="studentChatCreator" class="hidden compose">
+              <input id="studentChatTitle" type="text" placeholder="اسم دردشة الطلاب" />
+              <div class="inline-row">
+                <input id="studentMemberSearch" type="text" placeholder="ابحث عن طالب بالاسم أو ID" />
+                <button id="searchStudentMember" class="btn" type="button">بحث</button>
+              </div>
+              <ul id="studentSearchResult" class="mini"></ul>
+              <p>الأعضاء:</p>
+              <ul id="selectedStudentMembers" class="mini"></ul>
+              <button id="createStudentChat" class="btn primary" type="button">إنشاء دردشة طلاب</button>
+            </div>
+
+            <div class="chat-grid">
+              <ul id="studentChatRooms" class="mini"></ul>
+              <div id="studentChatConversation" class="hidden">
+                <h4 id="studentChatRoomTitle"></h4>
+                <div id="studentChatMessages" class="messages"></div>
+                <div class="inline-row">
+                  <input id="studentChatInput" type="text" placeholder="رسالة في دردشة الطلاب..." />
+                  <button id="sendStudentMessage" class="btn primary" type="button">إرسال</button>
+                </div>
+              </div>
+            </div>
+            <p id="studentChatHint" class="muted-note">إنشاء دردشة الطلاب متاح للطلاب فقط، والمراقبة للمرشد التربوي.</p>
           </section>
 
           <section class="panel">

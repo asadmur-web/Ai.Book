@@ -64,6 +64,8 @@ const state = {
   mode: "register",
   selectedMembers: [],
   selectedChatId: null,
+  selectedStudentChatId: null,
+  selectedStudentMembers: [],
   currentQuestion: null,
   data: safeParse(localStorage.getItem("aiBookData") || "{}", {}),
 };
@@ -74,12 +76,26 @@ state.data.chats = Array.isArray(state.data.chats) ? state.data.chats : [];
 state.data.staffMessages = Array.isArray(state.data.staffMessages) ? state.data.staffMessages : [];
 state.data.teacherAssignmentsByGradeSubject = state.data.teacherAssignmentsByGradeSubject || {};
 state.data.marks = state.data.marks || {}; // key => {daily1,monthExam,daily2,finalExam,qualitative}
+state.data.studentChats = Array.isArray(state.data.studentChats) ? state.data.studentChats : [];
+state.data.settings = state.data.settings || { theme: "theme-blue" };
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
 function saveData() { localStorage.setItem("aiBookData", JSON.stringify(state.data)); }
 function saveSession(s) { localStorage.setItem("aiBookSession", JSON.stringify(s)); }
 function clearSession() { localStorage.removeItem("aiBookSession"); }
+
+function applyTheme(theme) {
+  const chosen = theme || "theme-blue";
+  document.body.classList.remove("theme-blue", "theme-green", "theme-purple", "theme-sunset");
+  document.body.classList.add(chosen);
+  state.data.settings.theme = chosen;
+  saveData();
+}
+
+function isCounselorMonitor() {
+  return session?.role === "admin" && session?.position === "مرشد تربوي";
+}
 
 function setRole(role) {
   state.role = role;
@@ -350,6 +366,80 @@ function createChat() {
   renderChatRooms();
 }
 
+function visibleStudentChats() {
+  if (session.role === "student") return state.data.studentChats.filter((c) => c.members.some((m) => m.id === session.id));
+  if (isCounselorMonitor()) return state.data.studentChats;
+  return [];
+}
+
+function renderStudentChatRooms() {
+  const chats = visibleStudentChats();
+  el("studentChatRooms").innerHTML = chats.length
+    ? chats.map((c) => `<li><button class="btn openStudentChat" data-id="${c.id}">${esc(c.title)}</button><small>تحت المتابعة</small></li>`).join("")
+    : "<li>لا توجد دردشات طلاب حالياً.</li>";
+
+  if (!state.selectedStudentChatId || !chats.some((c) => c.id === state.selectedStudentChatId)) state.selectedStudentChatId = chats[0]?.id || null;
+  renderStudentConversation();
+}
+
+function renderStudentConversation() {
+  const chat = state.data.studentChats.find((c) => c.id === state.selectedStudentChatId);
+  if (!chat) return el("studentChatConversation").classList.add("hidden");
+  el("studentChatConversation").classList.remove("hidden");
+  el("studentChatRoomTitle").textContent = `${chat.title} (مراقبة المرشد)`;
+  el("studentChatMessages").innerHTML = (chat.messages || []).map((m) => `<div class="message-item ${m.senderId === session.id ? "me" : ""}"><strong>${esc(m.senderName)}:</strong> ${esc(m.text)}</div>`).join("") || "<div>ابدأ دردشة الطلاب...</div>";
+}
+
+function sendStudentChatMessage() {
+  const text = el("studentChatInput").value.trim();
+  if (!text || !state.selectedStudentChatId) return;
+  const chat = state.data.studentChats.find((c) => c.id === state.selectedStudentChatId);
+  if (!chat) return;
+  const allowed = isCounselorMonitor() || chat.members.some((m) => m.id === session.id);
+  if (!allowed) return;
+  chat.messages = chat.messages || [];
+  chat.messages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
+  el("studentChatInput").value = "";
+  saveData();
+  renderStudentConversation();
+}
+
+function searchStudentMembers() {
+  if (session.role !== "student") return;
+  const q = el("studentMemberSearch").value.trim().toLowerCase();
+  if (!q) return;
+  const users = state.data.users.filter((u) => u.role === "student" && u.grade === session.grade && u.id !== session.id && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
+  el("studentSearchResult").innerHTML = users.length
+    ? users.map((u) => `<li>${esc(u.fullName)} (${esc(u.id)}) <button class="btn addStudentMember" data-id="${u.id}">إضافة</button></li>`).join("")
+    : "<li>لا نتائج</li>";
+}
+
+function renderSelectedStudentMembers() {
+  el("selectedStudentMembers").innerHTML = state.selectedStudentMembers.length
+    ? state.selectedStudentMembers.map((m) => `<li>${esc(m.fullName)} (${esc(m.id)}) <button class="btn removeStudentMember" data-id="${m.id}">حذف</button></li>`).join("")
+    : "<li>لا يوجد أعضاء.</li>";
+}
+
+function createStudentChat() {
+  if (session.role !== "student") return;
+  const title = el("studentChatTitle").value.trim();
+  if (!title || !state.selectedStudentMembers.length) return;
+  state.data.studentChats.unshift({
+    id: uid("sc"),
+    ownerId: session.id,
+    title,
+    members: [{ id: session.id, fullName: session.fullName }, ...state.selectedStudentMembers],
+    messages: [],
+    monitoredBy: "مرشد تربوي",
+  });
+  state.selectedStudentMembers = [];
+  el("studentChatTitle").value = "";
+  el("studentSearchResult").innerHTML = "";
+  saveData();
+  renderSelectedStudentMembers();
+  renderStudentChatRooms();
+}
+
 function markKey(studentId, grade, subject, semester) {
   return `${studentId}|${grade}|${subject}|${semester}`;
 }
@@ -487,26 +577,27 @@ function renderStudentGradebook() {
 
 function generateQuestionCard() {
   const templates = [
-    () => {
-      const a = Math.floor(Math.random() * 90) + 10;
-      const b = Math.floor(Math.random() * 90) + 10;
-      return { q: `ما ناتج ${a} + ${b} ؟`, a: `${a + b}` };
-    },
-    () => {
-      const a = Math.floor(Math.random() * 10) + 2;
-      const b = Math.floor(Math.random() * 10) + 2;
-      return { q: `ما ناتج ${a} × ${b} ؟`, a: `${a * b}` };
-    },
+    () => { const a = Math.floor(Math.random() * 90) + 10; const b = Math.floor(Math.random() * 90) + 10; return { q: `ما ناتج ${a} + ${b} ؟`, a: `${a + b}` }; },
+    () => { const a = Math.floor(Math.random() * 20) + 2; const b = Math.floor(Math.random() * 12) + 2; return { q: `ما ناتج ${a} × ${b} ؟`, a: `${a * b}` }; },
+    () => { const a = Math.floor(Math.random() * 200) + 50; const b = Math.floor(Math.random() * 50) + 10; return { q: `احسب: ${a} - ${b}`, a: `${a - b}` }; },
     () => ({ q: "ما عاصمة الأردن؟", a: "عمّان" }),
-    () => ({ q: "في أي مادة يحدث البناء الضوئي؟", a: "مادة الكلوروفيل داخل النبات." }),
+    () => ({ q: "ما عاصمة فلسطين؟", a: "القدس" }),
+    () => ({ q: "في أي مادة يحدث البناء الضوئي؟", a: "في الكلوروفيل داخل النبات." }),
+    () => ({ q: "ما وحدة قياس القوة؟", a: "النيوتن." }),
     () => ({ q: "اذكر نوع الفعل في كلمة (كتب).", a: "فعل ماضٍ." }),
-    () => {
-      const x = Math.floor(Math.random() * 15) + 5;
-      return { q: `إذا كانت الزاوية المستقيمة ${180}°، فما مكمل ${x}°؟`, a: `${180 - x}°` };
-    },
+    () => ({ q: "ما مرادف كلمة (سريع)؟", a: "عاجل/خاطف بحسب السياق." }),
+    () => ({ q: "ما ناتج قسمة 144 على 12؟", a: "12" }),
+    () => ({ q: "ما الكوكب المعروف بالكوكب الأحمر؟", a: "المريخ" }),
+    () => ({ q: "من هو مكتشف قانون الجاذبية؟", a: "إسحاق نيوتن" }),
+    () => ({ q: "ما أكبر محيط في العالم؟", a: "المحيط الهادئ" }),
+    () => ({ q: "ما اسم العملية التي تحول السائل إلى غاز؟", a: "التبخر" }),
+    () => ({ q: "ما هو ضد كلمة (نجاح)؟", a: "فشل" }),
+    () => ({ q: "اذكر أول سورة في القرآن الكريم.", a: "سورة الفاتحة" }),
+    () => ({ q: "كم عدد زوايا المثلث؟", a: "3 زوايا" }),
+    () => ({ q: "ما حاصل 2 أس 5؟", a: "32" }),
+    () => ({ q: "من هو أبو الأنبياء؟", a: "إبراهيم عليه السلام" }),
+    () => ({ q: "ما جمع كلمة (مدرسة)؟", a: "مدارس" }),
   ];
-
-  // هذا يولد تنويعات كثيرة جدًا من نفس القوالب (بشكل عملي ملايين الإمكانيات)
   return templates[Math.floor(Math.random() * templates.length)]();
 }
 
@@ -543,6 +634,7 @@ function removeAccount(id) {
   state.data.posts = state.data.posts.filter((p) => p.authorId !== id);
   state.data.staffMessages = state.data.staffMessages.filter((m) => m.senderId !== id);
   state.data.chats = state.data.chats.filter((c) => c.ownerId !== id).map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
+  state.data.studentChats = state.data.studentChats.filter((c) => c.ownerId !== id).map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
   Object.keys(state.data.marks).forEach((k) => { if (k.startsWith(`${id}|`)) delete state.data.marks[k]; });
   saveData();
 }
@@ -552,7 +644,9 @@ function deleteMyAccount() {
   clearSession();
   session = null;
   state.selectedMembers = [];
+  state.selectedStudentMembers = [];
   state.selectedChatId = null;
+  state.selectedStudentChatId = null;
   state.currentQuestion = null;
   el("dashboard").classList.add("hidden");
   el("loginScreen").classList.remove("hidden");
@@ -650,6 +744,12 @@ function renderDashboard() {
   const showCards = session.role === "student";
   el("studentCardsBox").classList.toggle("hidden", !showCards);
 
+  const showStudentChatCreate = session.role === "student";
+  el("studentChatCreator").classList.toggle("hidden", !showStudentChatCreate);
+  const studentChatVisible = showStudentChatCreate || isCounselorMonitor();
+  el("studentChatsPanel").classList.toggle("hidden", !studentChatVisible);
+  el("studentChatHint").classList.toggle("hidden", studentChatVisible);
+
   const canDel = canAdminDelete();
   el("adminDeleteTools").classList.toggle("hidden", !canDel);
   el("adminDeleteHint").classList.toggle("hidden", canDel);
@@ -661,6 +761,8 @@ function renderDashboard() {
   renderStaffChat();
   renderTeacherGradebook();
   renderStudentGradebook();
+  renderStudentChatRooms();
+  renderSelectedStudentMembers();
   renderQuestionCard();
 }
 
@@ -705,11 +807,35 @@ document.addEventListener("click", (e) => {
     renderConversation();
   }
 
+  if (e.target.matches(".openStudentChat")) {
+    state.selectedStudentChatId = e.target.dataset.id;
+    renderStudentConversation();
+  }
+
+  if (e.target.matches(".addStudentMember")) {
+    const id = e.target.dataset.id;
+    const user = state.data.users.find((u) => u.id === id);
+    if (user && !state.selectedStudentMembers.some((m) => m.id === id)) {
+      state.selectedStudentMembers.push({ id: user.id, fullName: user.fullName });
+      renderSelectedStudentMembers();
+    }
+  }
+
+  if (e.target.matches(".removeStudentMember")) {
+    state.selectedStudentMembers = state.selectedStudentMembers.filter((m) => m.id !== e.target.dataset.id);
+    renderSelectedStudentMembers();
+  }
+
+  if (e.target.matches(".theme-btn")) {
+    applyTheme(e.target.dataset.theme);
+  }
+
   if (e.target.matches(".deleteUser") && canAdminDelete()) {
     removeAccount(e.target.dataset.id);
     searchDeleteTargets();
     renderPosts();
     renderChatRooms();
+    renderStudentChatRooms();
     renderStaffChat();
     renderTeacherGradebook();
     renderStudentGradebook();
@@ -729,6 +855,9 @@ el("publishAdminPost").addEventListener("click", publishAdminPost);
 el("doSearch").addEventListener("click", searchMembers);
 el("createChat").addEventListener("click", createChat);
 el("sendMessage").addEventListener("click", sendChatMessage);
+el("searchStudentMember").addEventListener("click", searchStudentMembers);
+el("createStudentChat").addEventListener("click", createStudentChat);
+el("sendStudentMessage").addEventListener("click", sendStudentChatMessage);
 el("sendStaffMessage").addEventListener("click", sendStaffMessage);
 el("searchDeleteTarget").addEventListener("click", searchDeleteTargets);
 el("saveMarks").addEventListener("click", saveTeacherMarks);
@@ -740,7 +869,9 @@ el("logoutBtn").addEventListener("click", () => {
   clearSession();
   session = null;
   state.selectedMembers = [];
+  state.selectedStudentMembers = [];
   state.selectedChatId = null;
+  state.selectedStudentChatId = null;
   state.currentQuestion = null;
   el("dashboard").classList.add("hidden");
   el("loginScreen").classList.remove("hidden");
@@ -753,7 +884,9 @@ el("logoutBtn").addEventListener("click", () => {
 
 renderLoginSetup();
 renderSelectedMembers();
+renderSelectedStudentMembers();
 setRole("student");
 setMode("register");
+applyTheme(state.data.settings.theme || "theme-blue");
 
 if (session) renderDashboard();
