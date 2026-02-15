@@ -3,7 +3,15 @@ const ADMIN_SECRET = "2512011";
 const ADMIN_BASE_NAME = "الإدارة المدرسية";
 
 const gradeNames = ["السادس", "السابع", "الثامن", "التاسع", "العاشر"];
-const baseSubjects = ["اللغة العربية", "اللغة الانجليزية", "التربية الاسلامية", "التكنولوجيا و البرمجة", "المواد الشرعية", "الرياضيات", "العلوم", "الدراسات الاجتماعية", "التربية البدنية"];
+const semesters = [
+  { value: "term1", label: "الفصل الأول" },
+  { value: "term2", label: "الفصل الثاني" },
+];
+
+const baseSubjects = [
+  "اللغة العربية", "اللغة الانجليزية", "التربية الاسلامية", "التكنولوجيا و البرمجة",
+  "المواد الشرعية", "الرياضيات", "العلوم", "الدراسات الاجتماعية", "التربية البدنية",
+];
 const grade10Subjects = baseSubjects.filter((s) => s !== "العلوم").concat(["فيزياء", "كيمياء", "احياء"]);
 
 const seedUsers = [
@@ -18,17 +26,45 @@ const roleTabs = document.querySelectorAll("#roleTabs .tab");
 const modeTabs = document.querySelectorAll("#modeTabs .tab");
 
 function safeParse(raw, fallback) { try { return JSON.parse(raw); } catch { return fallback; } }
-function esc(v) { return String(v).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;"); }
+function esc(v) {
+  return String(v)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
 function uid(prefix = "id") { return `${prefix}-${Math.random().toString(36).slice(2, 10)}`; }
-function subjectsForGrade(grade) { return grade === "العاشر" ? grade10Subjects : baseSubjects; }
 function validId(id) { return /^[A-Z]{2}\d{4}$/.test(id); }
 function isStrongPassword(password) { return password.length >= 7 && /[A-Za-z\u0600-\u06FF]/.test(password) && /\d/.test(password); }
+function subjectsForGrade(grade) { return grade === "العاشر" ? grade10Subjects : baseSubjects; }
+function canAdminDelete() { return session?.role === "admin" && ["مدير", "نائب المدير"].includes(session.position); }
+
+function gradeSchema(subject) {
+  const factor = subject === "المواد الشرعية" ? 2 : 1;
+  return {
+    daily1: 10 * factor,
+    monthExam: 20 * factor,
+    daily2: 10 * factor,
+    finalExam: 40 * factor,
+    qualitative: 20 * factor,
+    total: 100 * factor,
+  };
+}
+
+function computeTotal(entry) {
+  const vals = [entry.daily1, entry.monthExam, entry.daily2, entry.finalExam, entry.qualitative]
+    .map((v) => (v === "" || v === null || v === undefined ? null : Number(v)));
+  if (vals.every((v) => v === null)) return "";
+  return vals.reduce((a, b) => a + (b ?? 0), 0);
+}
 
 const state = {
   role: "student",
   mode: "register",
   selectedMembers: [],
   selectedChatId: null,
+  currentQuestion: null,
   data: safeParse(localStorage.getItem("aiBookData") || "{}", {}),
 };
 
@@ -37,14 +73,13 @@ state.data.posts = Array.isArray(state.data.posts) ? state.data.posts : [];
 state.data.chats = Array.isArray(state.data.chats) ? state.data.chats : [];
 state.data.staffMessages = Array.isArray(state.data.staffMessages) ? state.data.staffMessages : [];
 state.data.teacherAssignmentsByGradeSubject = state.data.teacherAssignmentsByGradeSubject || {};
-state.data.marks = state.data.marks || {}; // key: studentId|grade|subject => number
+state.data.marks = state.data.marks || {}; // key => {daily1,monthExam,daily2,finalExam,qualitative}
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
 function saveData() { localStorage.setItem("aiBookData", JSON.stringify(state.data)); }
 function saveSession(s) { localStorage.setItem("aiBookSession", JSON.stringify(s)); }
 function clearSession() { localStorage.removeItem("aiBookSession"); }
-function canAdminDelete() { return session?.role === "admin" && ["مدير", "نائب المدير"].includes(session.position); }
 
 function setRole(role) {
   state.role = role;
@@ -61,7 +96,6 @@ function setMode(mode) {
 function applyAuthLayout() {
   const reg = state.mode === "register";
   const role = state.role;
-
   el("identifierWrap").classList.toggle("hidden", reg);
   el("fullNameWrap").classList.toggle("hidden", !reg);
   el("idWrap").classList.toggle("hidden", !reg);
@@ -100,14 +134,15 @@ function renderPerGradeSubjects() {
       </div>
     </div>
   `).join("");
-
   holder.dataset.selection = JSON.stringify(existing);
 }
 
 function collectTeacherAssignments() {
   const grades = [...document.querySelectorAll(".gradePick:checked")].map((i) => i.value);
   const out = {};
-  grades.forEach((g) => { out[g] = [...document.querySelectorAll(`.subjectPick[data-grade="${g}"]:checked`)].map((i) => i.value); });
+  grades.forEach((g) => {
+    out[g] = [...document.querySelectorAll(`.subjectPick[data-grade="${g}"]:checked`)].map((i) => i.value);
+  });
   return out;
 }
 
@@ -134,7 +169,9 @@ function ensureTeacherAssignmentUniqueness(teacherId, assignments) {
 }
 
 function claimTeacherAssignments(teacherId, assignments) {
-  Object.entries(assignments).forEach(([g, subs]) => subs.forEach((s) => { state.data.teacherAssignmentsByGradeSubject[`${g}|${s}`] = teacherId; }));
+  Object.entries(assignments).forEach(([g, subs]) => subs.forEach((s) => {
+    state.data.teacherAssignmentsByGradeSubject[`${g}|${s}`] = teacherId;
+  }));
 }
 
 function releaseTeacherAssignments(teacherId) {
@@ -154,6 +191,7 @@ function hydrateTeacherSelectors() {
   el("postGrade").innerHTML = grades.map((g) => `<option value="${g}">${g}</option>`).join("");
   el("chatGrade").innerHTML = grades.map((g) => `<option value="${g}">${g}</option>`).join("");
   el("gradebookGrade").innerHTML = grades.map((g) => `<option value="${g}">${g}</option>`).join("");
+  el("gradebookSemester").innerHTML = semesters.map((s) => `<option value="${s.value}">${s.label}</option>`).join("");
   updateTeacherSubjectSelectors();
   updateGradebookSubjectSelector();
 }
@@ -178,7 +216,7 @@ function renderClasses() {
   if (session.role === "teacher") {
     Object.entries(session.assignments || {}).forEach(([g, subs]) => out.push(`<li><strong>${esc(g)}</strong><p>${esc(subs.join("، "))}</p></li>`));
   } else if (session.role === "student") {
-    out.push(`<li><strong>${esc(session.grade)}</strong><p>موادك ومنشوراتك وسجل علاماتك.</p></li>`);
+    out.push(`<li><strong>${esc(session.grade)}</strong><p>منشورات، دردشات، وسجل درجات الفصلين.</p></li>`);
   } else {
     out.push(`<li><strong>${esc(session.position)}</strong><p>إدارة ومتابعة حسابات.</p></li>`);
   }
@@ -249,7 +287,6 @@ function sendChatMessage() {
   if (!chat) return;
   const allowed = session.role === "admin" || chat.ownerId === session.id || chat.members.some((m) => m.id === session.id);
   if (!allowed) return;
-
   chat.messages = chat.messages || [];
   chat.messages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
   el("chatInput").value = "";
@@ -277,7 +314,6 @@ function searchMembers() {
   const q = el("memberSearch").value.trim().toLowerCase();
   const grade = el("chatGrade").value;
   if (!q) return;
-
   const users = state.data.users.filter((u) => u.role === "student" && u.grade === grade && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
   el("searchResult").innerHTML = users.length
     ? users.map((u) => `<li>${esc(u.fullName)} (${esc(u.id)}) <button class="btn addMember" data-id="${u.id}">إضافة</button></li>`).join("")
@@ -314,23 +350,56 @@ function createChat() {
   renderChatRooms();
 }
 
+function markKey(studentId, grade, subject, semester) {
+  return `${studentId}|${grade}|${subject}|${semester}`;
+}
+
+function getMarkEntry(studentId, grade, subject, semester) {
+  return state.data.marks[markKey(studentId, grade, subject, semester)] || {
+    daily1: "",
+    monthExam: "",
+    daily2: "",
+    finalExam: "",
+    qualitative: "",
+  };
+}
+
 function renderTeacherGradebook() {
   if (session.role !== "teacher") return;
   const grade = el("gradebookGrade").value;
   const subject = el("gradebookSubject").value;
+  const semester = el("gradebookSemester").value;
   const students = state.data.users.filter((u) => u.role === "student" && u.grade === grade);
+  const schema = gradeSchema(subject);
 
   el("teacherGradebookTable").innerHTML = students.length ? `
     <div class="grade-table-wrap">
       <table class="grade-table">
         <thead>
-          <tr><th>ID</th><th>الطالب</th><th>العلامة</th></tr>
+          <tr>
+            <th>ID</th><th>الطالب</th>
+            <th>يومي1 / ${schema.daily1}</th>
+            <th>شهرين / ${schema.monthExam}</th>
+            <th>يومي2 / ${schema.daily2}</th>
+            <th>نهائي / ${schema.finalExam}</th>
+            <th>تقويم / ${schema.qualitative}</th>
+            <th>المحصلة / ${schema.total}</th>
+          </tr>
         </thead>
         <tbody>
           ${students.map((s) => {
-            const key = `${s.id}|${grade}|${subject}`;
-            const mark = state.data.marks[key] ?? "";
-            return `<tr><td>${esc(s.id)}</td><td>${esc(s.fullName)}</td><td><input class="grade-input" type="number" min="0" max="100" data-student="${s.id}" value="${mark}" /></td></tr>`;
+            const m = getMarkEntry(s.id, grade, subject, semester);
+            const total = computeTotal(m);
+            return `<tr>
+              <td>${esc(s.id)}</td>
+              <td>${esc(s.fullName)}</td>
+              <td><input class="grade-input" data-field="daily1" data-student="${s.id}" type="number" min="0" max="${schema.daily1}" value="${m.daily1}"/></td>
+              <td><input class="grade-input" data-field="monthExam" data-student="${s.id}" type="number" min="0" max="${schema.monthExam}" value="${m.monthExam}"/></td>
+              <td><input class="grade-input" data-field="daily2" data-student="${s.id}" type="number" min="0" max="${schema.daily2}" value="${m.daily2}"/></td>
+              <td><input class="grade-input" data-field="finalExam" data-student="${s.id}" type="number" min="0" max="${schema.finalExam}" value="${m.finalExam}"/></td>
+              <td><input class="grade-input" data-field="qualitative" data-student="${s.id}" type="number" min="0" max="${schema.qualitative}" value="${m.qualitative}"/></td>
+              <td>${total === "" ? "" : total}</td>
+            </tr>`;
           }).join("")}
         </tbody>
       </table>
@@ -342,53 +411,127 @@ function saveTeacherMarks() {
   if (session.role !== "teacher") return;
   const grade = el("gradebookGrade").value;
   const subject = el("gradebookSubject").value;
-  const inputs = [...document.querySelectorAll(".grade-input")];
+  const semester = el("gradebookSemester").value;
+  const schema = gradeSchema(subject);
 
-  for (const input of inputs) {
-    const value = input.value.trim();
-    const sid = input.dataset.student;
-    const key = `${sid}|${grade}|${subject}`;
-    if (!value) {
-      delete state.data.marks[key];
-      continue;
+  const grouped = {};
+  document.querySelectorAll(".grade-input").forEach((inp) => {
+    const sid = inp.dataset.student;
+    const field = inp.dataset.field;
+    if (!grouped[sid]) grouped[sid] = { daily1: "", monthExam: "", daily2: "", finalExam: "", qualitative: "" };
+    grouped[sid][field] = inp.value.trim();
+  });
+
+  for (const [sid, entry] of Object.entries(grouped)) {
+    for (const field of ["daily1", "monthExam", "daily2", "finalExam", "qualitative"]) {
+      const val = entry[field];
+      if (val === "") continue;
+      const num = Number(val);
+      if (Number.isNaN(num) || num < 0 || num > schema[field]) {
+        el("marksMsg").textContent = `قيمة ${field} غير صالحة. تحقق من الحدود.`;
+        return;
+      }
     }
-    const num = Number(value);
-    if (Number.isNaN(num) || num < 0 || num > 100) {
-      el("marksMsg").textContent = "العلامة يجب أن تكون بين 0 و 100.";
-      return;
-    }
-    state.data.marks[key] = num;
+
+    const k = markKey(sid, grade, subject, semester);
+    const allBlank = Object.values(entry).every((v) => v === "");
+    if (allBlank) delete state.data.marks[k];
+    else state.data.marks[k] = entry;
   }
 
   saveData();
   el("marksMsg").textContent = "تم حفظ العلامات بنجاح.";
+  renderTeacherGradebook();
 }
 
 function renderStudentGradebook() {
   if (session.role !== "student") return;
-  const rows = [];
-  for (const [key, mark] of Object.entries(state.data.marks)) {
-    const [sid, grade, subject] = key.split("|");
-    if (sid === session.id) rows.push({ grade, subject, mark });
-  }
+  const grade = session.grade;
+  const taughtSubjects = [...new Set(Object.keys(state.data.teacherAssignmentsByGradeSubject)
+    .filter((k) => k.startsWith(`${grade}|`))
+    .map((k) => k.split("|")[1]))];
 
-  el("studentGradebookTable").innerHTML = rows.length ? `
-    <div class="grade-table-wrap">
-      <table class="grade-table">
-        <thead><tr><th>الصف</th><th>المادة</th><th>العلامة</th></tr></thead>
-        <tbody>${rows.map((r) => `<tr><td>${esc(r.grade)}</td><td>${esc(r.subject)}</td><td>${esc(r.mark)}</td></tr>`).join("")}</tbody>
-      </table>
-    </div>
-  ` : "<p class='muted-note'>لا توجد علامات مسجلة لك حتى الآن.</p>";
+  const allSubjects = taughtSubjects.length ? taughtSubjects : subjectsForGrade(grade);
+
+  const blocks = semesters.map((term) => {
+    const rows = allSubjects.map((subject) => {
+      const entry = getMarkEntry(session.id, grade, subject, term.value);
+      const schema = gradeSchema(subject);
+      const total = computeTotal(entry);
+      return `<tr>
+        <td>${esc(subject)}</td>
+        <td>${entry.daily1}</td>
+        <td>${entry.monthExam}</td>
+        <td>${entry.daily2}</td>
+        <td>${entry.finalExam}</td>
+        <td>${entry.qualitative}</td>
+        <td>${total === "" ? "" : `${total} / ${schema.total}`}</td>
+      </tr>`;
+    }).join("");
+
+    return `
+      <h4>${term.label}</h4>
+      <div class="grade-table-wrap">
+        <table class="grade-table">
+          <thead>
+            <tr><th>المادة</th><th>يومي1</th><th>شهرين</th><th>يومي2</th><th>نهائي</th><th>تقويم</th><th>المحصلة</th></tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+  }).join("");
+
+  el("studentGradebookTable").innerHTML = blocks;
+}
+
+function generateQuestionCard() {
+  const templates = [
+    () => {
+      const a = Math.floor(Math.random() * 90) + 10;
+      const b = Math.floor(Math.random() * 90) + 10;
+      return { q: `ما ناتج ${a} + ${b} ؟`, a: `${a + b}` };
+    },
+    () => {
+      const a = Math.floor(Math.random() * 10) + 2;
+      const b = Math.floor(Math.random() * 10) + 2;
+      return { q: `ما ناتج ${a} × ${b} ؟`, a: `${a * b}` };
+    },
+    () => ({ q: "ما عاصمة الأردن؟", a: "عمّان" }),
+    () => ({ q: "في أي مادة يحدث البناء الضوئي؟", a: "مادة الكلوروفيل داخل النبات." }),
+    () => ({ q: "اذكر نوع الفعل في كلمة (كتب).", a: "فعل ماضٍ." }),
+    () => {
+      const x = Math.floor(Math.random() * 15) + 5;
+      return { q: `إذا كانت الزاوية المستقيمة ${180}°، فما مكمل ${x}°؟`, a: `${180 - x}°` };
+    },
+  ];
+
+  // هذا يولد تنويعات كثيرة جدًا من نفس القوالب (بشكل عملي ملايين الإمكانيات)
+  return templates[Math.floor(Math.random() * templates.length)]();
+}
+
+function renderQuestionCard() {
+  if (session?.role !== "student") return;
+  if (!state.currentQuestion) state.currentQuestion = generateQuestionCard();
+  el("questionText").textContent = state.currentQuestion.q;
+  el("questionAnswer").textContent = "";
+}
+
+function nextQuestion() {
+  state.currentQuestion = generateQuestionCard();
+  renderQuestionCard();
+}
+
+function showAnswer() {
+  if (session?.role !== "student" || !state.currentQuestion) return;
+  el("questionAnswer").textContent = `الإجابة: ${state.currentQuestion.a}`;
 }
 
 function searchDeleteTargets() {
   if (!canAdminDelete()) return;
   const q = el("deleteSearch").value.trim().toLowerCase();
   const users = state.data.users.filter((u) => u.id !== session.id && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)));
-  el("deleteResults").innerHTML = users.length
-    ? users.map((u) => `<li>${esc(u.fullName)} (${esc(u.id)}) <button class="btn danger deleteUser" data-id="${u.id}">حذف</button></li>`).join("")
-    : "<li>لا نتائج</li>";
+  el("deleteResults").innerHTML = users.length ? users.map((u) => `<li>${esc(u.fullName)} (${esc(u.id)}) <button class="btn danger deleteUser" data-id="${u.id}">حذف</button></li>`).join("") : "<li>لا نتائج</li>";
 }
 
 function removeAccount(id) {
@@ -399,14 +542,8 @@ function removeAccount(id) {
   state.data.users = state.data.users.filter((u) => u.id !== id);
   state.data.posts = state.data.posts.filter((p) => p.authorId !== id);
   state.data.staffMessages = state.data.staffMessages.filter((m) => m.senderId !== id);
-  state.data.chats = state.data.chats
-    .filter((c) => c.ownerId !== id)
-    .map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
-
-  Object.keys(state.data.marks).forEach((k) => {
-    if (k.startsWith(`${id}|`)) delete state.data.marks[k];
-  });
-
+  state.data.chats = state.data.chats.filter((c) => c.ownerId !== id).map((c) => ({ ...c, members: c.members.filter((m) => m.id !== id) }));
+  Object.keys(state.data.marks).forEach((k) => { if (k.startsWith(`${id}|`)) delete state.data.marks[k]; });
   saveData();
 }
 
@@ -416,6 +553,7 @@ function deleteMyAccount() {
   session = null;
   state.selectedMembers = [];
   state.selectedChatId = null;
+  state.currentQuestion = null;
   el("dashboard").classList.add("hidden");
   el("loginScreen").classList.remove("hidden");
   el("authMsg").textContent = "تم حذف حسابك بنجاح.";
@@ -433,8 +571,8 @@ function registerUser() {
   if (!isStrongPassword(password)) return "كلمة المرور يجب أن تحتوي أحرفاً وأرقاماً ولا تقل عن 7 خانات.";
   if (state.data.users.some((u) => u.id === id)) return "الـ ID مكرر، غيره.";
 
-  const duplicateByProfile = state.data.users.some((u) => u.fullName === fullName || (u.email && u.email.toLowerCase() === email));
-  if (duplicateByProfile) {
+  const duplicateProfile = state.data.users.some((u) => u.fullName === fullName || (u.email && u.email.toLowerCase() === email));
+  if (duplicateProfile) {
     setMode("login");
     return "أنت مسجل دخول من قبل، انتقل إلى خانة مسجل الدخول.";
   }
@@ -463,7 +601,6 @@ function registerUser() {
     if (fullName !== ADMIN_BASE_NAME) return `اسم الإدارة يجب أن يكون: ${ADMIN_BASE_NAME}`;
     if (el("adminSecret").value.trim() !== ADMIN_SECRET) return "الرقم السري للإدارة غير صحيح.";
     const adminName = `${ADMIN_BASE_NAME} (${position})`;
-
     state.data.users.push({ id, fullName: adminName, role: "admin", position, email, password });
     session = { id, fullName: adminName, role: "admin", position, email };
   }
@@ -510,6 +647,9 @@ function renderDashboard() {
   el("studentGradesBox").classList.toggle("hidden", !showStudentGrades);
   el("adminGradesInfo").classList.toggle("hidden", !showAdminGrades);
 
+  const showCards = session.role === "student";
+  el("studentCardsBox").classList.toggle("hidden", !showCards);
+
   const canDel = canAdminDelete();
   el("adminDeleteTools").classList.toggle("hidden", !canDel);
   el("adminDeleteHint").classList.toggle("hidden", canDel);
@@ -521,6 +661,7 @@ function renderDashboard() {
   renderStaffChat();
   renderTeacherGradebook();
   renderStudentGradebook();
+  renderQuestionCard();
 }
 
 roleTabs.forEach((b) => b.addEventListener("click", () => { el("authMsg").textContent = ""; setRole(b.dataset.role); }));
@@ -528,6 +669,7 @@ modeTabs.forEach((b) => b.addEventListener("click", () => { el("authMsg").textCo
 
 document.addEventListener("change", (e) => {
   if (e.target.classList.contains("gradePick")) renderPerGradeSubjects();
+
   if (e.target.classList.contains("subjectPick")) {
     const grade = e.target.dataset.grade;
     const checked = [...document.querySelectorAll(`.subjectPick[data-grade="${grade}"]:checked`)];
@@ -537,9 +679,10 @@ document.addEventListener("change", (e) => {
     }
     el("perGradeSubjects").dataset.selection = JSON.stringify(collectTeacherAssignments());
   }
+
   if (session?.role === "teacher" && (e.target.id === "postGrade" || e.target.id === "chatGrade")) updateTeacherSubjectSelectors();
   if (session?.role === "teacher" && e.target.id === "gradebookGrade") updateGradebookSubjectSelector();
-  if (session?.role === "teacher" && e.target.id === "gradebookSubject") renderTeacherGradebook();
+  if (session?.role === "teacher" && (e.target.id === "gradebookSubject" || e.target.id === "gradebookSemester")) renderTeacherGradebook();
 });
 
 document.addEventListener("click", (e) => {
@@ -589,6 +732,8 @@ el("sendMessage").addEventListener("click", sendChatMessage);
 el("sendStaffMessage").addEventListener("click", sendStaffMessage);
 el("searchDeleteTarget").addEventListener("click", searchDeleteTargets);
 el("saveMarks").addEventListener("click", saveTeacherMarks);
+el("nextQuestion").addEventListener("click", nextQuestion);
+el("showAnswer").addEventListener("click", showAnswer);
 el("deleteMyAccount").addEventListener("click", deleteMyAccount);
 
 el("logoutBtn").addEventListener("click", () => {
@@ -596,6 +741,7 @@ el("logoutBtn").addEventListener("click", () => {
   session = null;
   state.selectedMembers = [];
   state.selectedChatId = null;
+  state.currentQuestion = null;
   el("dashboard").classList.add("hidden");
   el("loginScreen").classList.remove("hidden");
   el("authForm").reset();

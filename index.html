@@ -167,6 +167,7 @@
             <div id="teacherGradesBox" class="hidden compose">
               <label>الصف <select id="gradebookGrade"></select></label>
               <label>المادة <select id="gradebookSubject"></select></label>
+              <label>الفصل <select id="gradebookSemester"></select></label>
               <div id="teacherGradebookTable"></div>
               <button id="saveMarks" class="btn primary" type="button">حفظ العلامات</button>
               <p id="marksMsg" class="msg"></p>
@@ -178,6 +179,21 @@
 
             <div id="adminGradesInfo" class="hidden muted-note">
               لوحة الإدارة تعرض معلومات عامة، وإدخال العلامات يكون من حساب المعلم فقط.
+            </div>
+          </section>
+
+
+
+          <section class="panel" id="studentCardsBox">
+            <h3>بطاقات تعليمية تفاعلية</h3>
+            <p class="muted-note">أسئلة متنوعة متجددة، والإجابة تظهر عند الضغط (للطلاب فقط).</p>
+            <div class="grade-table-wrap">
+              <p id="questionText"></p>
+              <div class="inline-row">
+                <button id="showAnswer" class="btn primary" type="button">إظهار الإجابة</button>
+                <button id="nextQuestion" class="btn" type="button">سؤال جديد</button>
+              </div>
+              <p id="questionAnswer"></p>
             </div>
           </section>
 
