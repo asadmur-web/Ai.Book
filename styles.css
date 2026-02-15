@@ -241,3 +241,43 @@ body.theme-sunset {
   --bg2: #9b3d1d;
   --bg3: #ff7b2f;
 }
+
+
+.chip-list {
+  list-style: none;
+  margin: 0 0 0.55rem;
+  padding: 0;
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.chip-list li {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.btn.chip {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(168, 192, 255, 0.35);
+}
+
+body.icons-rounded .btn,
+body.icons-rounded .tab,
+body.icons-rounded input,
+body.icons-rounded select,
+body.icons-rounded textarea {
+  border-radius: 12px;
+}
+
+body.icons-square .btn,
+body.icons-square .tab,
+body.icons-square input,
+body.icons-square select,
+body.icons-square textarea {
+  border-radius: 4px;
+}

@@ -77,7 +77,7 @@ state.data.staffMessages = Array.isArray(state.data.staffMessages) ? state.data.
 state.data.teacherAssignmentsByGradeSubject = state.data.teacherAssignmentsByGradeSubject || {};
 state.data.marks = state.data.marks || {}; // key => {daily1,monthExam,daily2,finalExam,qualitative}
 state.data.studentChats = Array.isArray(state.data.studentChats) ? state.data.studentChats : [];
-state.data.settings = state.data.settings || { theme: "theme-blue" };
+state.data.settings = state.data.settings || { theme: "theme-blue", iconShape: "icons-rounded" };
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
@@ -90,6 +90,14 @@ function applyTheme(theme) {
   document.body.classList.remove("theme-blue", "theme-green", "theme-purple", "theme-sunset");
   document.body.classList.add(chosen);
   state.data.settings.theme = chosen;
+  saveData();
+}
+
+function applyIconShape(shape) {
+  const chosen = shape || "icons-rounded";
+  document.body.classList.remove("icons-rounded", "icons-square");
+  document.body.classList.add(chosen);
+  state.data.settings.iconShape = chosen;
   saveData();
 }
 
@@ -372,8 +380,19 @@ function visibleStudentChats() {
   return [];
 }
 
+function renderCounselorQuickChats(chats) {
+  const showQuick = isCounselorMonitor();
+  el("counselorQuickChats").classList.toggle("hidden", !showQuick);
+  if (!showQuick) return;
+
+  el("counselorChatRooms").innerHTML = chats.length
+    ? chats.map((c) => `<li><button class="btn chip openStudentChat" data-id="${c.id}">${esc(c.title)}</button></li>`).join("")
+    : '<li class="muted-note">لا توجد دردشات طلاب.</li>';
+}
+
 function renderStudentChatRooms() {
   const chats = visibleStudentChats();
+  renderCounselorQuickChats(chats);
   el("studentChatRooms").innerHTML = chats.length
     ? chats.map((c) => `<li><button class="btn openStudentChat" data-id="${c.id}">${esc(c.title)}</button><small>تحت المتابعة</small></li>`).join("")
     : "<li>لا توجد دردشات طلاب حالياً.</li>";
@@ -693,6 +712,7 @@ function registerUser() {
   if (role === "admin") {
     const position = el("adminPosition").value;
     if (fullName !== ADMIN_BASE_NAME) return `اسم الإدارة يجب أن يكون: ${ADMIN_BASE_NAME}`;
+    if (state.data.users.some((u) => u.role === "admin" && u.position === position)) return `حساب ${position} موجود بالفعل ويمكنه تسجيل الدخول فقط.`;
     if (el("adminSecret").value.trim() !== ADMIN_SECRET) return "الرقم السري للإدارة غير صحيح.";
     const adminName = `${ADMIN_BASE_NAME} (${position})`;
     state.data.users.push({ id, fullName: adminName, role: "admin", position, email, password });
@@ -731,6 +751,7 @@ function renderDashboard() {
   el("teacherChatTools").classList.toggle("hidden", session.role !== "teacher");
 
   const staffVisible = ["teacher", "admin"].includes(session.role);
+  el("staffChatPanel").classList.toggle("hidden", !staffVisible);
   el("staffChatBox").classList.toggle("hidden", !staffVisible);
   el("staffHint").classList.toggle("hidden", staffVisible);
 
@@ -751,6 +772,7 @@ function renderDashboard() {
   el("studentChatHint").classList.toggle("hidden", studentChatVisible);
 
   const canDel = canAdminDelete();
+  el("adminManagePanel").classList.toggle("hidden", !canDel);
   el("adminDeleteTools").classList.toggle("hidden", !canDel);
   el("adminDeleteHint").classList.toggle("hidden", canDel);
 
@@ -830,6 +852,10 @@ document.addEventListener("click", (e) => {
     applyTheme(e.target.dataset.theme);
   }
 
+  if (e.target.matches(".icon-shape-btn")) {
+    applyIconShape(e.target.dataset.iconShape);
+  }
+
   if (e.target.matches(".deleteUser") && canAdminDelete()) {
     removeAccount(e.target.dataset.id);
     searchDeleteTargets();
@@ -888,5 +914,6 @@ renderSelectedStudentMembers();
 setRole("student");
 setMode("register");
 applyTheme(state.data.settings.theme || "theme-blue");
+applyIconShape(state.data.settings.iconShape || "icons-rounded");
 
 if (session) renderDashboard();

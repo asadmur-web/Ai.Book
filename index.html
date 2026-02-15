@@ -107,12 +107,17 @@
 
           <section class="panel" id="settingsPanel">
             <h3>الإعدادات</h3>
-            <p class="muted-note">غيّر لون الخلفية حسب راحتك.</p>
+            <p class="muted-note">غيّر لون الخلفية وشكل الأيقونات.</p>
             <div class="theme-grid">
               <button class="btn theme-btn" data-theme="theme-blue" type="button">أزرق</button>
               <button class="btn theme-btn" data-theme="theme-green" type="button">أخضر</button>
               <button class="btn theme-btn" data-theme="theme-purple" type="button">بنفسجي</button>
               <button class="btn theme-btn" data-theme="theme-sunset" type="button">غروب</button>
+            </div>
+            <p class="muted-note">شكل الأزرار والأيقونات:</p>
+            <div class="theme-grid">
+              <button class="btn icon-shape-btn" data-icon-shape="icons-rounded" type="button">دائري ناعم</button>
+              <button class="btn icon-shape-btn" data-icon-shape="icons-square" type="button">مربع حديث</button>
             </div>
           </section>
 
@@ -131,7 +136,7 @@
             <ul id="postList" class="list"></ul>
           </section>
 
-          <section class="panel">
+          <section class="panel" id="staffChatPanel">
             <h3>دردشة الطاقم المدرسي</h3>
             <div id="staffChatBox" class="hidden">
               <div id="staffMessages" class="messages"></div>
@@ -143,7 +148,7 @@
             <p id="staffHint">هذه الدردشة للمعلمين والإدارة فقط.</p>
           </section>
 
-          <section class="panel">
+          <section class="panel" id="classChatsPanel">
             <h3>الدردشات الصفية</h3>
             <div id="teacherChatTools" class="hidden compose">
               <input id="chatTitle" type="text" placeholder="اسم غرفة الدردشة" />
@@ -184,6 +189,11 @@
               <p>الأعضاء:</p>
               <ul id="selectedStudentMembers" class="mini"></ul>
               <button id="createStudentChat" class="btn primary" type="button">إنشاء دردشة طلاب</button>
+            </div>
+
+            <div id="counselorQuickChats" class="hidden">
+              <h4>قائمة سريعة للمرشد</h4>
+              <ul id="counselorChatRooms" class="chip-list"></ul>
             </div>
 
             <div class="chat-grid">
@@ -236,7 +246,7 @@
             </div>
           </section>
 
-          <section class="panel">
+          <section class="panel" id="adminManagePanel">
             <h3>إدارة الحسابات (مدير/نائب المدير)</h3>
             <div id="adminDeleteTools" class="hidden compose">
               <div class="inline-row">
