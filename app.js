@@ -35,6 +35,7 @@ function esc(v) {
 function uid(prefix = "id") { return `${prefix}-${Math.random().toString(36).slice(2, 10)}`; }
 function validId(id) { return /^[A-Z]{2}\d{4}$/.test(id); }
 function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email); }
+function emailExists(email) { return state.data.users.some((u) => (u.email || "").toLowerCase() === email.toLowerCase()); }
 function validFullName(fullName) { return fullName.split(/\s+/).filter(Boolean).length >= 4; }
 function isStrongPassword(password) { return password.length >= 7 && /[A-Za-z\u0600-\u06FF]/.test(password) && /\d/.test(password); }
 function subjectsForGrade(grade) { return grade === "العاشر" ? grade10Subjects : baseSubjects; }
@@ -101,7 +102,7 @@ function clearSession() { localStorage.removeItem("aiBookSession"); }
 
 function applyTheme(theme) {
   const chosen = theme || "theme-green";
-  document.body.classList.remove("theme-blue", "theme-green", "theme-purple", "theme-sunset");
+  document.body.classList.remove("theme-white", "theme-green", "theme-purple", "theme-sunset", "theme-black");
   document.body.classList.add(chosen);
   state.data.settings.theme = chosen;
   saveData();
@@ -845,10 +846,15 @@ function registerUser() {
   if (!isStrongPassword(password)) return "كلمة المرور يجب أن تحتوي أحرفاً وأرقاماً ولا تقل عن 7 خانات.";
   if (state.data.users.some((u) => u.id === id)) return "الـ ID مكرر، غيره.";
 
-  const duplicateProfile = state.data.users.some((u) => u.fullName === fullName || (u.email && u.email.toLowerCase() === email));
-  if (duplicateProfile) {
+  if (emailExists(email)) {
     setMode("login");
-    return "أنت مسجل دخول من قبل، انتقل إلى خانة مسجل الدخول.";
+    return "هذا البريد الإلكتروني مسجل بالفعل، استخدم خانة مسجل دخول.";
+  }
+
+  const duplicateName = state.data.users.some((u) => u.fullName === fullName);
+  if (duplicateName) {
+    setMode("login");
+    return "هذا الاسم مسجل من قبل، انتقل إلى خانة مسجل الدخول.";
   }
 
   if (role === "student") {
@@ -896,6 +902,7 @@ function loginUser() {
   if (!looksLikeEmail && !validId(identifier.toUpperCase())) return "أدخل بريدًا إلكترونيًا صحيحًا أو ID بصيغة صحيحة.";
 
   const user = findByIdentifier(identifier);
+  if (looksLikeEmail && !user) return "هذا البريد غير مسجل، أنشئ حساباً جديداً.";
   if (!user || user.password !== password) return "بيانات الدخول غير صحيحة.";
   if (user.role !== state.role) return "اختر نوع الحساب الصحيح قبل تسجيل الدخول.";
 

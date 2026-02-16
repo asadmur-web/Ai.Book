@@ -254,10 +254,16 @@ textarea { min-height: 88px; }
   gap: 0.45rem;
 }
 
-body.theme-blue {
-  --bg1: #062216;
-  --bg2: #0d6e43;
-  --bg3: #20a45f;
+body.theme-white {
+  --bg1: #e8ecef;
+  --bg2: #f4f7f9;
+  --bg3: #ffffff;
+  --card: rgba(255, 255, 255, 0.84);
+  --line: rgba(70, 90, 100, 0.25);
+  --text: #1c2a2f;
+  --muted: #4f6269;
+  --primary: #2a7b56;
+  --primary-2: #1d5d42;
 }
 
 body.theme-green {
@@ -335,4 +341,17 @@ body.icons-square .tab {
 .active-choice {
   outline: 2px solid rgba(171, 238, 193, 0.9);
   box-shadow: 0 0 0 3px rgba(95, 200, 133, 0.25);
+}
+
+
+body.theme-black {
+  --bg1: #050505;
+  --bg2: #111111;
+  --bg3: #1f1f1f;
+  --card: rgba(24, 24, 24, 0.88);
+  --line: rgba(200, 200, 200, 0.26);
+  --text: #f6f6f6;
+  --muted: #d0d0d0;
+  --primary: #2f2f2f;
+  --primary-2: #161616;
 }
