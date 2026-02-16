@@ -34,6 +34,7 @@ function esc(v) {
 }
 function uid(prefix = "id") { return `${prefix}-${Math.random().toString(36).slice(2, 10)}`; }
 function validId(id) { return /^[A-Z]{2}\d{4}$/.test(id); }
+function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email); }
 function isStrongPassword(password) { return password.length >= 7 && /[A-Za-z\u0600-\u06FF]/.test(password) && /\d/.test(password); }
 function subjectsForGrade(grade) { return grade === "العاشر" ? grade10Subjects : baseSubjects; }
 function canAdminDelete() { return session?.role === "admin" && ["مدير", "نائب المدير"].includes(session.position); }
@@ -818,6 +819,7 @@ function registerUser() {
   const password = el("password").value.trim();
 
   if (!fullName || !id || !email || !password) return "أكمل الحقول المطلوبة.";
+  if (!validEmail(email)) return "صيغة البريد الإلكتروني غير صحيحة.";
   if (!validId(id)) return "الـ ID يجب أن يكون حرفين كابتل + 4 أرقام (مثل ST1234).";
   if (!isStrongPassword(password)) return "كلمة المرور يجب أن تحتوي أحرفاً وأرقاماً ولا تقل عن 7 خانات.";
   if (state.data.users.some((u) => u.id === id)) return "الـ ID مكرر، غيره.";
@@ -868,8 +870,12 @@ function loginUser() {
   const password = el("password").value.trim();
   if (!identifier || !password) return "أدخل البريد/ID وكلمة المرور.";
 
+  const looksLikeEmail = identifier.includes("@");
+  if (looksLikeEmail && !validEmail(identifier)) return "صيغة البريد الإلكتروني غير صحيحة.";
+
   const user = findByIdentifier(identifier);
   if (!user || user.password !== password) return "بيانات الدخول غير صحيحة.";
+  if (user.role !== state.role) return "اختر نوع الحساب الصحيح قبل تسجيل الدخول.";
 
   if (user.role === "student") session = { id: user.id, fullName: user.fullName, role: "student", grade: user.grade, email: user.email };
   if (user.role === "teacher") session = { id: user.id, fullName: user.fullName, role: "teacher", email: user.email, assignments: user.assignments || {} };
