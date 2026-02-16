@@ -95,7 +95,7 @@ body {
   cursor: pointer;
   font-weight: 700;
 }
-.tab { background: #2b4178; color: #e9f0ff; }
+.tab { background: rgba(18, 70, 45, 0.92); color: #eafff2; border: 1px solid rgba(154, 221, 178, 0.35); }
 .tab.active, .btn.primary {
   background: linear-gradient(180deg, var(--primary), var(--primary-2));
   color: #fff;
@@ -126,7 +126,23 @@ textarea { min-height: 88px; }
   margin-bottom: 0.8rem;
   padding-bottom: 0.7rem;
 }
-.actions { display: flex; gap: 0.5rem; }
+.actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+.icon-btn {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.15rem;
+  background: rgba(20, 104, 63, 0.9);
+  border: 1px solid rgba(177, 228, 194, 0.45);
+}
+
+#settingsToggle[aria-expanded="true"] {
+  background: linear-gradient(180deg, #1cb15a, #0d7836);
+  box-shadow: 0 0 0 2px rgba(170, 245, 199, 0.35);
+}
 #subtitle, .muted-note, small { color: var(--muted); }
 
 .dashboard-grid {
@@ -226,6 +242,9 @@ textarea { min-height: 88px; }
   .tabs { grid-template-columns: 1fr; }
   .inline-row { flex-direction: column; }
   .topbar { flex-direction: column; align-items: flex-start; gap: 0.6rem; }
+  .actions { width: 100%; }
+  .actions .btn { width: 100%; }
+  .icon-btn { width: 100%; height: 40px; }
 }
 
 
@@ -288,7 +307,11 @@ body.icons-rounded .tab,
 body.icons-rounded input,
 body.icons-rounded select,
 body.icons-rounded textarea {
-  border-radius: 12px;
+  border-radius: 16px;
+}
+
+body.icons-rounded .btn {
+  box-shadow: inset 0 0 0 1px rgba(170, 240, 190, 0.15);
 }
 
 body.icons-square .btn,
@@ -296,5 +319,20 @@ body.icons-square .tab,
 body.icons-square input,
 body.icons-square select,
 body.icons-square textarea {
-  border-radius: 4px;
+  border-radius: 2px;
+}
+
+body.icons-square .btn,
+body.icons-square .tab {
+  border: 1px solid rgba(175, 235, 196, 0.55);
+  letter-spacing: 0.2px;
+}
+
+#settingsPanel {
+  max-width: 520px;
+}
+
+.active-choice {
+  outline: 2px solid rgba(171, 238, 193, 0.9);
+  box-shadow: 0 0 0 3px rgba(95, 200, 133, 0.25);
 }

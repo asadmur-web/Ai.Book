@@ -35,6 +35,7 @@ function esc(v) {
 function uid(prefix = "id") { return `${prefix}-${Math.random().toString(36).slice(2, 10)}`; }
 function validId(id) { return /^[A-Z]{2}\d{4}$/.test(id); }
 function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email); }
+function validFullName(fullName) { return fullName.split(/\s+/).filter(Boolean).length >= 4; }
 function isStrongPassword(password) { return password.length >= 7 && /[A-Za-z\u0600-\u06FF]/.test(password) && /\d/.test(password); }
 function subjectsForGrade(grade) { return grade === "العاشر" ? grade10Subjects : baseSubjects; }
 function canAdminDelete() { return session?.role === "admin" && ["مدير", "نائب المدير"].includes(session.position); }
@@ -90,7 +91,7 @@ state.data.directChats = asArray(state.data.directChats).map((c) => ({
   members: asArray(c.members),
   messages: asArray(c.messages),
 })).filter((c) => c && c.id && c.title);
-state.data.settings = { theme: "theme-green", iconShape: "icons-rounded", ...asObject(state.data.settings) };
+state.data.settings = { theme: "theme-green", iconShape: "icons-rounded", settingsOpen: false, ...asObject(state.data.settings) };
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
@@ -104,6 +105,7 @@ function applyTheme(theme) {
   document.body.classList.add(chosen);
   state.data.settings.theme = chosen;
   saveData();
+  highlightSettingsChoices();
 }
 
 function applyIconShape(shape) {
@@ -112,12 +114,29 @@ function applyIconShape(shape) {
   document.body.classList.add(chosen);
   state.data.settings.iconShape = chosen;
   saveData();
+  highlightSettingsChoices();
 }
 
 function isCounselorMonitor() {
   return session?.role === "admin" && session?.position === "مرشد تربوي";
 }
 
+function syncSettingsPanel() {
+  const isOpen = Boolean(state.data.settings.settingsOpen);
+  el("settingsPanel").classList.toggle("hidden", !isOpen);
+  el("settingsToggle")?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+}
+
+function toggleSettingsPanel() {
+  state.data.settings.settingsOpen = !state.data.settings.settingsOpen;
+  saveData();
+  syncSettingsPanel();
+}
+
+function highlightSettingsChoices() {
+  document.querySelectorAll('.theme-btn').forEach((btn) => btn.classList.toggle('active-choice', btn.dataset.theme === state.data.settings.theme));
+  document.querySelectorAll('.icon-shape-btn').forEach((btn) => btn.classList.toggle('active-choice', btn.dataset.iconShape === state.data.settings.iconShape));
+}
 
 function resetDataForPublish() {
   const flag = "aiBookPublishResetV3";
@@ -251,7 +270,8 @@ function releaseTeacherAssignments(teacherId) {
 
 function findByIdentifier(identifier) {
   const idf = identifier.trim();
-  return state.data.users.find((u) => u.id === idf || (u.email && u.email.toLowerCase() === idf.toLowerCase()));
+  const upperId = idf.toUpperCase();
+  return state.data.users.find((u) => u.id === upperId || (u.email && u.email.toLowerCase() === idf.toLowerCase()));
 }
 
 function hydrateTeacherSelectors() {
@@ -819,6 +839,7 @@ function registerUser() {
   const password = el("password").value.trim();
 
   if (!fullName || !id || !email || !password) return "أكمل الحقول المطلوبة.";
+  if (role !== "admin" && !validFullName(fullName)) return "الاسم يجب أن يكون رباعياً على الأقل.";
   if (!validEmail(email)) return "صيغة البريد الإلكتروني غير صحيحة.";
   if (!validId(id)) return "الـ ID يجب أن يكون حرفين كابتل + 4 أرقام (مثل ST1234).";
   if (!isStrongPassword(password)) return "كلمة المرور يجب أن تحتوي أحرفاً وأرقاماً ولا تقل عن 7 خانات.";
@@ -872,6 +893,7 @@ function loginUser() {
 
   const looksLikeEmail = identifier.includes("@");
   if (looksLikeEmail && !validEmail(identifier)) return "صيغة البريد الإلكتروني غير صحيحة.";
+  if (!looksLikeEmail && !validId(identifier.toUpperCase())) return "أدخل بريدًا إلكترونيًا صحيحًا أو ID بصيغة صحيحة.";
 
   const user = findByIdentifier(identifier);
   if (!user || user.password !== password) return "بيانات الدخول غير صحيحة.";
@@ -936,6 +958,8 @@ function renderDashboard() {
   renderSelectedStudentMembers();
   renderQuestionCard();
   renderDirectChats();
+  syncSettingsPanel();
+  highlightSettingsChoices();
 }
 
 roleTabs.forEach((b) => b.addEventListener("click", () => { el("authMsg").textContent = ""; setRole(b.dataset.role); }));
@@ -1051,6 +1075,7 @@ el("saveMarks").addEventListener("click", saveTeacherMarks);
 el("nextQuestion").addEventListener("click", nextQuestion);
 el("showAnswer").addEventListener("click", showAnswer);
 el("deleteMyAccount").addEventListener("click", deleteMyAccount);
+el("settingsToggle").addEventListener("click", toggleSettingsPanel);
 
 el("logoutBtn").addEventListener("click", () => {
   clearSession();
@@ -1066,6 +1091,7 @@ el("logoutBtn").addEventListener("click", () => {
   el("authForm").reset();
   renderTeacherAssignmentPicker();
   renderSelectedMembers();
+  state.data.settings.settingsOpen = false;
   setRole("student");
   setMode("register");
 });
@@ -1079,5 +1105,7 @@ setRole("student");
 setMode("register");
 applyTheme(state.data.settings.theme || "theme-green");
 applyIconShape(state.data.settings.iconShape || "icons-rounded");
+syncSettingsPanel();
+highlightSettingsChoices();
 
 if (session) renderDashboard();
