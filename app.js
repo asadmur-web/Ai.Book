@@ -64,6 +64,28 @@ function computeTotal(entry) {
   return vals.reduce((a, b) => a + (b ?? 0), 0);
 }
 
+
+function normalizeData(raw) {
+  const data = asObject(raw);
+  data.users = asArray(data.users).filter((u) => u && u.id && u.role);
+  data.posts = asArray(data.posts).filter((p) => p && p.authorId && p.text);
+  data.chats = asArray(data.chats).map((c) => ({ ...c, members: asArray(c.members), messages: asArray(c.messages) })).filter((c) => c && c.id && c.title);
+  data.staffMessages = asArray(data.staffMessages);
+  data.teacherAssignmentsByGradeSubject = asObject(data.teacherAssignmentsByGradeSubject);
+  data.marks = asObject(data.marks);
+  data.studentChats = asArray(data.studentChats).map((c) => ({ ...c, members: asArray(c.members), messages: asArray(c.messages) })).filter((c) => c && c.id && c.title);
+  data.directChats = asArray(data.directChats).map((c) => ({ ...c, members: asArray(c.members), messages: asArray(c.messages) })).filter((c) => c && c.id && c.title);
+  data.settings = { theme: "theme-green", iconShape: "icons-rounded", settingsOpen: false, notificationsOpen: false, panelCollapse: {}, ...asObject(data.settings) };
+  data.notifications = asObject(data.notifications);
+  return data;
+}
+
+function syncDataFromStorage() {
+  const fresh = normalizeData(safeParse(localStorage.getItem("aiBookData") || "{}", {}));
+  state.data = fresh;
+  ensureSessionStillValid();
+}
+
 const state = {
   role: "student",
   mode: "register",
@@ -77,28 +99,7 @@ const state = {
   data: safeParse(localStorage.getItem("aiBookData") || "{}", {}),
 };
 
-state.data.users = asArray(state.data.users).filter((u) => u && u.id && u.role) || [...seedUsers];
-state.data.posts = asArray(state.data.posts).filter((p) => p && p.authorId && p.text);
-state.data.chats = asArray(state.data.chats).map((c) => ({
-  ...c,
-  members: asArray(c.members),
-  messages: asArray(c.messages),
-})).filter((c) => c && c.id && c.title);
-state.data.staffMessages = asArray(state.data.staffMessages);
-state.data.teacherAssignmentsByGradeSubject = asObject(state.data.teacherAssignmentsByGradeSubject);
-state.data.marks = asObject(state.data.marks); // key => {daily1,monthExam,daily2,finalExam,qualitative}
-state.data.studentChats = asArray(state.data.studentChats).map((c) => ({
-  ...c,
-  members: asArray(c.members),
-  messages: asArray(c.messages),
-})).filter((c) => c && c.id && c.title);
-state.data.directChats = asArray(state.data.directChats).map((c) => ({
-  ...c,
-  members: asArray(c.members),
-  messages: asArray(c.messages),
-})).filter((c) => c && c.id && c.title);
-state.data.settings = { theme: "theme-green", iconShape: "icons-rounded", settingsOpen: false, notificationsOpen: false, panelCollapse: {}, ...asObject(state.data.settings) };
-state.data.notifications = asObject(state.data.notifications);
+state.data = normalizeData(state.data);
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
@@ -400,6 +401,7 @@ function visiblePosts() {
 }
 
 function renderPosts() {
+  syncDataFromStorage();
   const posts = visiblePosts();
   el("postList").innerHTML = posts.length
     ? posts.map((p) => {
@@ -511,10 +513,11 @@ function sendStaffMessage() {
 }
 
 function searchMembers() {
+  syncDataFromStorage();
   const q = el("memberSearch").value.trim().toLowerCase();
   const grade = el("chatGrade").value;
   if (!q) return;
-  const users = state.data.users.filter((u) => u.role === "student" && u.grade === grade && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
+  const users = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === normText(grade) && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
   el("searchResult").innerHTML = users.length
     ? users.map((u) => `<li>${esc(u.fullName)} (${esc(u.id)}) <button class="btn addMember" data-id="${u.id}">إضافة</button></li>`).join("")
     : "<li>لا نتائج</li>";
@@ -601,10 +604,11 @@ function sendStudentChatMessage() {
 }
 
 function searchStudentMembers() {
+  syncDataFromStorage();
   if (session.role !== "student") return;
   const q = el("studentMemberSearch").value.trim().toLowerCase();
   if (!q) return;
-  const users = state.data.users.filter((u) => u.role === "student" && u.grade === session.grade && u.id !== session.id && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
+  const users = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === normText(session.grade) && u.id !== session.id && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
   el("studentSearchResult").innerHTML = users.length
     ? users.map((u) => `<li>${esc(u.fullName)} (${esc(u.id)}) <button class="btn addStudentMember" data-id="${u.id}">إضافة</button></li>`).join("")
     : "<li>لا نتائج</li>";
@@ -651,6 +655,7 @@ function getMarkEntry(studentId, grade, subject, semester) {
 }
 
 function renderTeacherGradebook() {
+  syncDataFromStorage();
   if (session.role !== "teacher") return;
   const grade = normText(el("gradebookGrade").value);
   const subject = el("gradebookSubject").value;
@@ -872,6 +877,7 @@ function renderDirectConversation() {
 }
 
 function searchDirectUsers() {
+  syncDataFromStorage();
   if (session.role !== "admin") return;
   const q = el("directChatSearch").value.trim().toLowerCase();
   if (!q) return;
@@ -914,6 +920,7 @@ function sendDirectMessage() {
 }
 
 function searchDeleteTargets() {
+  syncDataFromStorage();
   if (!canAdminDelete()) return;
   const q = el("deleteSearch").value.trim().toLowerCase();
   const users = state.data.users.filter((u) => u.id !== session.id && (u.fullName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q)));
@@ -1108,6 +1115,7 @@ function sendAdminWarning() {
 }
 
 function renderDashboard() {
+  syncDataFromStorage();
   el("loginScreen").classList.add("hidden");
   el("dashboard").classList.remove("hidden");
   el("welcome").textContent = `مرحباً ${session.fullName}`;
@@ -1344,3 +1352,9 @@ enhancePanelsCollapsing();
 highlightSettingsChoices();
 
 if (session) renderDashboard();
+
+window.addEventListener("storage", (e) => {
+  if (e.key !== "aiBookData") return;
+  syncDataFromStorage();
+  if (session) renderDashboard();
+});
