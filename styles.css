@@ -234,6 +234,10 @@ textarea { min-height: 88px; }
   .login-grid, .dashboard-grid, .chat-grid {
     grid-template-columns: 1fr;
   }
+
+  #directChatPanel .chat-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 680px) {
@@ -540,4 +544,70 @@ body.theme-black {
     width: 100%;
     margin-inline-end: -0.3rem;
   }
+}
+
+
+.assignment-grid {
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+}
+
+.assign-check {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px dashed rgba(170, 220, 190, 0.35);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.assign-check input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.assign-check .checkmark {
+  --clr: #0B6E4F;
+  height: 1.2em;
+  width: 1.2em;
+  background-color: #cfcfcf;
+  border-radius: 50%;
+  transition: 300ms;
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.assign-check input:checked ~ .checkmark {
+  background-color: var(--clr);
+  border-radius: .45rem;
+  animation: pulse 500ms ease-in-out;
+}
+
+.assign-check .checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 0.42em;
+  top: 0.2em;
+  width: 0.22em;
+  height: 0.48em;
+  border: solid #E0E0E2;
+  border-width: 0 0.14em 0.14em 0;
+  transform: rotate(45deg);
+}
+
+.assign-check input:checked ~ .checkmark:after {
+  display: block;
+}
+
+#directChatPanel .chat-grid {
+  grid-template-columns: 180px 1fr;
+  gap: 0.45rem;
+}
+
+#directChatPanel .messages {
+  min-height: 130px;
+  max-height: 190px;
 }

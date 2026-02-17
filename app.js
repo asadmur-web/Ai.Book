@@ -280,7 +280,7 @@ function renderLoginSetup() {
 function renderTeacherAssignmentPicker() {
   el("teacherAssignments").innerHTML = `
     <label>اختر الصفوف التي تدرّسها</label>
-    <div class="subject-grid">${gradeNames.map((g) => `<label><input type="checkbox" class="gradePick" value="${g}"/> ${g}</label>`).join("")}</div>
+    <div class="subject-grid assignment-grid">${gradeNames.map((g) => `<label class="assign-check"><input type="checkbox" class="gradePick" value="${g}"/><span class="checkmark"></span><span>${g}</span></label>`).join("")}</div>
     <div id="perGradeSubjects"></div>
   `;
 }
@@ -295,7 +295,7 @@ function renderPerGradeSubjects() {
       <strong>${g}</strong>
       <p>اختر مادتين كحد أقصى:</p>
       <div class="subject-grid">
-        ${subjectsForGrade(g).map((s) => `<label><input type="checkbox" class="subjectPick" data-grade="${g}" value="${s}" ${(existing[g] || []).includes(s) ? "checked" : ""}/> ${s}</label>`).join("")}
+        ${subjectsForGrade(g).map((s) => `<label class="assign-check"><input type="checkbox" class="subjectPick" data-grade="${g}" value="${s}" ${(existing[g] || []).includes(s) ? "checked" : ""}/><span class="checkmark"></span><span>${s}</span></label>`).join("")}
       </div>
     </div>
   `).join("");
@@ -806,6 +806,36 @@ function visibleDirectChats() {
   return state.data.directChats.filter((c) => c.members.some((m) => m.id === session.id));
 }
 
+function getCounselorUser() {
+  return state.data.users.find((u) => u.role === "admin" && u.position === "مرشد تربوي");
+}
+
+function startCounselorChat() {
+  if (session?.role !== "student") return;
+  const counselor = getCounselorUser();
+  if (!counselor) {
+    el("counselorChatMsg").textContent = "لا يوجد حساب مرشد تربوي حالياً.";
+    return;
+  }
+
+  let chat = state.data.directChats.find((c) => c.members.some((m) => m.id === session.id) && c.members.some((m) => m.id === counselor.id));
+  if (!chat) {
+    chat = {
+      id: uid("d"),
+      title: `الطالب ${session.fullName} ↔ المرشد ${counselor.fullName}`,
+      members: [{ id: session.id, fullName: session.fullName }, { id: counselor.id, fullName: counselor.fullName }],
+      messages: [],
+    };
+    state.data.directChats.unshift(chat);
+    pushNotification([counselor.id], `طالب بدأ محادثة مباشرة معك: ${session.fullName}`, "chat");
+  }
+
+  state.selectedDirectChatId = chat.id;
+  el("counselorChatMsg").textContent = "تم فتح الدردشة مع المرشد.";
+  saveData();
+  renderDirectChats();
+}
+
 function renderDirectChats() {
   const chats = visibleDirectChats();
   el("directChatRooms").innerHTML = chats.length
@@ -1103,6 +1133,9 @@ function renderDashboard() {
   const directVisible = ["admin", "teacher", "student"].includes(session.role);
   el("directChatPanel").classList.toggle("hidden", !directVisible);
   el("adminDirectTools").classList.toggle("hidden", session.role !== "admin");
+  const studentToCounselor = session.role === "student" || isCounselorMonitor();
+  el("studentCounselorTools").classList.toggle("hidden", !studentToCounselor);
+  if (session.role !== "student") el("counselorChatMsg").textContent = "";
 
   hydrateTeacherSelectors();
   renderClasses();
@@ -1253,6 +1286,7 @@ el("changePasswordBtn").addEventListener("click", changePassword);
 el("adminTargetGrade").addEventListener("change", renderAdminStudentsByGrade);
 el("sendAbsence").addEventListener("click", sendAdminAbsence);
 el("sendWarning").addEventListener("click", sendAdminWarning);
+el("startCounselorChat").addEventListener("click", startCounselorChat);
 
 el("logoutBtn").addEventListener("click", () => {
   clearSession();
