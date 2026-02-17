@@ -2,6 +2,8 @@ const STUDENT_SECRET = "30201";
 const TEACHER_SECRET = "951951";
 const ADMIN_SECRET = "2512011";
 const ADMIN_BASE_NAME = "الإدارة المدرسية";
+const MAX_INPUT_LEN = 500;
+const LOGIN_RATE_LIMIT_MS = 900;
 
 const gradeNames = ["السادس", "السابع", "الثامن", "التاسع", "العاشر"];
 const semesters = [
@@ -33,6 +35,7 @@ function esc(v) {
     .replaceAll("'", "&#39;");
 }
 function uid(prefix = "id") { return `${prefix}-${Math.random().toString(36).slice(2, 10)}`; }
+function sanitizeText(text) { return String(text || "").trim().slice(0, MAX_INPUT_LEN); }
 function validId(id) { return /^[A-Z]{2}\d{4}$/.test(id); }
 function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email); }
 function emailExists(email) { return state.data.users.some((u) => (u.email || "").toLowerCase() === email.toLowerCase()); }
@@ -68,6 +71,7 @@ const state = {
   selectedStudentChatId: null,
   selectedStudentMembers: [],
   selectedDirectChatId: null,
+  lastLoginAttemptAt: 0,
   currentQuestion: null,
   data: safeParse(localStorage.getItem("aiBookData") || "{}", {}),
 };
@@ -92,7 +96,8 @@ state.data.directChats = asArray(state.data.directChats).map((c) => ({
   members: asArray(c.members),
   messages: asArray(c.messages),
 })).filter((c) => c && c.id && c.title);
-state.data.settings = { theme: "theme-green", iconShape: "icons-rounded", settingsOpen: false, ...asObject(state.data.settings) };
+state.data.settings = { theme: "theme-green", iconShape: "icons-rounded", settingsOpen: false, notificationsOpen: false, panelCollapse: {}, ...asObject(state.data.settings) };
+state.data.notifications = asObject(state.data.notifications);
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
 
@@ -137,6 +142,70 @@ function toggleSettingsPanel() {
 function highlightSettingsChoices() {
   document.querySelectorAll('.theme-btn').forEach((btn) => btn.classList.toggle('active-choice', btn.dataset.theme === state.data.settings.theme));
   document.querySelectorAll('.icon-shape-btn').forEach((btn) => btn.classList.toggle('active-choice', btn.dataset.iconShape === state.data.settings.iconShape));
+}
+
+function notificationsForMe() {
+  if (!session) return [];
+  return asArray(state.data.notifications[session.id]);
+}
+
+function pushNotification(targetIds, text, kind = "info") {
+  const message = sanitizeText(text);
+  if (!message) return;
+  asArray(targetIds).forEach((id) => {
+    state.data.notifications[id] = asArray(state.data.notifications[id]);
+    state.data.notifications[id].unshift({ id: uid("n"), text: message, kind, at: Date.now() });
+    state.data.notifications[id] = state.data.notifications[id].slice(0, 120);
+  });
+}
+
+function renderNotifications() {
+  const list = notificationsForMe();
+  const holder = el("notificationsList");
+  if (!holder) return;
+  holder.innerHTML = list.length
+    ? list.map((n) => `<li class="notif ${esc(n.kind)}"><strong>${new Date(n.at).toLocaleString("ar-EG")}</strong><p>${esc(n.text)}</p></li>`).join("")
+    : "<li>لا توجد إشعارات حالياً.</li>";
+}
+
+function syncNotificationsPanel() {
+  const isOpen = Boolean(state.data.settings.notificationsOpen);
+  el("notificationsPanel")?.classList.toggle("hidden", !isOpen);
+}
+
+function toggleNotificationsPanel() {
+  state.data.settings.notificationsOpen = !state.data.settings.notificationsOpen;
+  saveData();
+  syncNotificationsPanel();
+}
+
+function setPanelCollapsed(id, collapsed) {
+  state.data.settings.panelCollapse = asObject(state.data.settings.panelCollapse);
+  state.data.settings.panelCollapse[id] = collapsed;
+  saveData();
+}
+
+function enhancePanelsCollapsing() {
+  document.querySelectorAll('.panel').forEach((panel) => {
+    if (!panel.id || panel.dataset.enhanced === "1") return;
+    const title = panel.querySelector('h3');
+    if (!title) return;
+    panel.dataset.enhanced = "1";
+    const wrap = document.createElement('div');
+    wrap.className = 'panel-head';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn panel-collapse-btn';
+    btn.textContent = '−';
+    btn.dataset.panelId = panel.id;
+    title.parentNode.insertBefore(wrap, title);
+    wrap.appendChild(title);
+    wrap.appendChild(btn);
+
+    const collapsed = Boolean(asObject(state.data.settings.panelCollapse)[panel.id]);
+    panel.classList.toggle('collapsed-panel', collapsed);
+    btn.textContent = collapsed ? '+' : '−';
+  });
 }
 
 function resetDataForPublish() {
@@ -198,6 +267,8 @@ function renderLoginSetup() {
   el("studentGrade").innerHTML = gradeNames.map((g) => `<option value="${g}">${g}</option>`).join("");
   const adminGradeSelect = el("adminPostGrade");
   if (adminGradeSelect) adminGradeSelect.innerHTML = `<option value="all">جميع الصفوف</option>${gradeNames.map((g) => `<option value="${g}">${g}</option>`).join("")}`;
+  const adminTargetGrade = el("adminTargetGrade");
+  if (adminTargetGrade) adminTargetGrade.innerHTML = gradeNames.map((g) => `<option value="${g}">${g}</option>`).join("");
   renderTeacherAssignmentPicker();
 }
 
@@ -327,7 +398,9 @@ function renderPosts() {
   el("postList").innerHTML = posts.length
     ? posts.map((p) => {
       const title = p.audience === "global" ? "إعلان إداري عام" : p.audience === "grade" ? `إعلان إداري لصف ${esc(p.grade)}` : `${esc(p.grade)} - ${esc(p.subject)}`;
-      return `<li><strong>${title}</strong><p>${esc(p.text)}</p><small>${esc(p.authorName)}</small></li>`;
+      const type = p.type || "منشور";
+      const cls = type === "واجب" ? "type-homework" : type === "امتحان" ? "type-exam" : "type-important";
+      return `<li><strong>${title}</strong> <span class="post-type ${cls}">${esc(type)}</span><p>${esc(p.text)}</p><small>${esc(p.authorName)}</small></li>`;
     }).join("")
     : "<li>لا توجد منشورات.</li>";
 }
@@ -335,9 +408,12 @@ function renderPosts() {
 function publishTeacherPost() {
   const grade = el("postGrade").value;
   const subject = el("postSubject").value;
-  const text = el("postText").value.trim();
+  const text = sanitizeText(el("postText").value);
+  const postType = el("postType").value;
   if (!text || !session.assignments[grade]?.includes(subject)) return;
-  state.data.posts.unshift({ id: uid("p"), audience: "targeted", authorId: session.id, authorName: session.fullName, grade, subject, text });
+  state.data.posts.unshift({ id: uid("p"), audience: "targeted", type: postType, authorId: session.id, authorName: session.fullName, grade, subject, text });
+  const targets = state.data.users.filter((u) => u.role === "student" && u.grade === grade).map((u) => u.id);
+  pushNotification(targets, `منشور ${postType} جديد في ${subject} - صف ${grade}`, "post");
   el("postText").value = "";
   saveData();
   renderPosts();
@@ -345,10 +421,12 @@ function publishTeacherPost() {
 
 function publishAdminPost() {
   const grade = el("adminPostGrade").value;
-  const text = el("adminPostText").value.trim();
+  const text = sanitizeText(el("adminPostText").value);
   if (!text) return;
   const audience = grade === "all" ? "global" : "grade";
-  state.data.posts.unshift({ id: uid("p"), audience, authorId: session.id, authorName: session.fullName, grade, subject: "إدارة مدرسية", text });
+  state.data.posts.unshift({ id: uid("p"), audience, type: "إعلان إداري", authorId: session.id, authorName: session.fullName, grade, subject: "إدارة مدرسية", text });
+  const targets = state.data.users.filter((u) => audience === "global" ? true : u.grade === grade).map((u) => u.id);
+  pushNotification(targets, "إعلان إداري جديد", "admin");
   el("adminPostText").value = "";
   saveData();
   renderPosts();
@@ -379,7 +457,7 @@ function renderConversation() {
 }
 
 function sendChatMessage() {
-  const text = el("chatInput").value.trim();
+  const text = sanitizeText(el("chatInput").value);
   if (!text || !state.selectedChatId) return;
   const chat = state.data.chats.find((c) => c.id === state.selectedChatId);
   if (!chat) return;
@@ -387,6 +465,7 @@ function sendChatMessage() {
   if (!allowed) return;
   chat.messages = chat.messages || [];
   chat.messages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
+  pushNotification(chat.members.filter((m) => m.id !== session.id).map((m) => m.id), `رسالة جديدة في دردشة ${chat.title}`, "chat");
   el("chatInput").value = "";
   saveData();
   renderConversation();
@@ -400,9 +479,10 @@ function renderStaffChat() {
 
 function sendStaffMessage() {
   if (!["teacher", "admin"].includes(session.role)) return;
-  const text = el("staffInput").value.trim();
+  const text = sanitizeText(el("staffInput").value);
   if (!text) return;
   state.data.staffMessages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
+  pushNotification(state.data.users.filter((u) => ["teacher", "admin"].includes(u.role) && u.id !== session.id).map((u) => u.id), "رسالة جديدة في دردشة الطاقم", "chat");
   el("staffInput").value = "";
   saveData();
   renderStaffChat();
@@ -484,7 +564,7 @@ function renderStudentConversation() {
 }
 
 function sendStudentChatMessage() {
-  const text = el("studentChatInput").value.trim();
+  const text = sanitizeText(el("studentChatInput").value);
   if (!text || !state.selectedStudentChatId) return;
   const chat = state.data.studentChats.find((c) => c.id === state.selectedStudentChatId);
   if (!chat) return;
@@ -492,6 +572,7 @@ function sendStudentChatMessage() {
   if (!allowed) return;
   chat.messages = chat.messages || [];
   chat.messages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
+  pushNotification(chat.members.filter((m) => m.id !== session.id).map((m) => m.id), `رسالة جديدة في دردشة الطلاب ${chat.title}`, "chat");
   el("studentChatInput").value = "";
   saveData();
   renderStudentConversation();
@@ -622,6 +703,8 @@ function saveTeacherMarks() {
     else state.data.marks[k] = entry;
   }
 
+  const studentIds = Object.keys(grouped);
+  pushNotification(studentIds, `تم تحديث علامات ${subject} (${semester === "term1" ? "الفصل الأول" : "الفصل الثاني"})`, "marks");
   saveData();
   el("marksMsg").textContent = "تم حفظ العلامات بنجاح.";
   renderTeacherGradebook();
@@ -767,11 +850,12 @@ function startDirectChat(targetId) {
 }
 
 function sendDirectMessage() {
-  const text = el("directChatInput").value.trim();
+  const text = sanitizeText(el("directChatInput").value);
   if (!text || !state.selectedDirectChatId) return;
   const chat = state.data.directChats.find((c) => c.id === state.selectedDirectChatId);
   if (!chat || !chat.members.some((m) => m.id === session.id)) return;
   chat.messages.push({ senderId: session.id, senderName: session.fullName, text, at: Date.now() });
+  pushNotification(chat.members.filter((m) => m.id !== session.id).map((m) => m.id), "رسالة مباشرة جديدة", "chat");
   el("directChatInput").value = "";
   saveData();
   renderDirectConversation();
@@ -893,8 +977,11 @@ function registerUser() {
 }
 
 function loginUser() {
-  const identifier = el("identifier").value.trim();
-  const password = el("password").value.trim();
+  const now = Date.now();
+  if (now - state.lastLoginAttemptAt < LOGIN_RATE_LIMIT_MS) return "انتظر لحظة ثم حاول مرة أخرى.";
+  state.lastLoginAttemptAt = now;
+  const identifier = sanitizeText(el("identifier").value);
+  const password = sanitizeText(el("password").value);
   if (!identifier || !password) return "أدخل البريد/ID وكلمة المرور.";
 
   const looksLikeEmail = identifier.includes("@");
@@ -912,6 +999,60 @@ function loginUser() {
 
   saveSession(session);
   return "";
+}
+
+function changePassword() {
+  if (!session) return;
+  const current = sanitizeText(el("currentPassword").value);
+  const nextPwd = sanitizeText(el("newPassword").value);
+  const user = state.data.users.find((u) => u.id === session.id);
+  if (!user || user.password !== current) return (el("passwordMsg").textContent = "كلمة المرور الحالية غير صحيحة.");
+  if (!isStrongPassword(nextPwd)) return (el("passwordMsg").textContent = "كلمة المرور الجديدة ضعيفة.");
+  user.password = nextPwd;
+  saveData();
+  el("currentPassword").value = "";
+  el("newPassword").value = "";
+  el("passwordMsg").textContent = "تم تحديث كلمة المرور.";
+  pushNotification([session.id], "تم تغيير كلمة المرور بنجاح", "security");
+}
+
+function renderAdminStudentsByGrade() {
+  if (session?.role !== "admin") return;
+  const grade = el("adminTargetGrade")?.value;
+  const students = state.data.users.filter((u) => u.role === "student" && u.grade === grade);
+  const select = el("adminTargetStudent");
+  if (!select) return;
+  select.innerHTML = students.map((s) => `<option value="${s.id}">${esc(s.fullName)} (${esc(s.id)})</option>`).join("");
+}
+
+function openMailClient(to, subject, body) {
+  const url = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.open(url, '_blank');
+}
+
+function sendAdminAbsence() {
+  const sid = el("adminTargetStudent").value;
+  const date = el("absenceDate").value || new Date().toISOString().slice(0,10);
+  const student = state.data.users.find((u) => u.id === sid && u.role === "student");
+  if (!student) return;
+  const msg = `تم تسجيل غياب يوم بتاريخ ${date}.`;
+  pushNotification([sid], msg, "admin");
+  openMailClient(student.email || "", "تنبيه غياب", msg);
+  el("adminActionMsg").textContent = "تم إرسال تنبيه الغياب للطالب.";
+  saveData();
+}
+
+function sendAdminWarning() {
+  const sid = el("adminTargetStudent").value;
+  const text = sanitizeText(el("warningText").value);
+  const student = state.data.users.find((u) => u.id === sid && u.role === "student");
+  if (!student || !text) return;
+  const msg = `تنبيه إداري: ${text}`;
+  pushNotification([sid], msg, "admin");
+  openMailClient(student.email || "", "تنبيه إداري", msg);
+  el("adminActionMsg").textContent = "تم إرسال التنبيه للطالب.";
+  el("warningText").value = "";
+  saveData();
 }
 
 function renderDashboard() {
@@ -950,6 +1091,10 @@ function renderDashboard() {
   el("adminDeleteTools").classList.toggle("hidden", !canDel);
   el("adminDeleteHint").classList.toggle("hidden", canDel);
 
+  const adminActionsVisible = session.role === "admin";
+  el("adminAttendancePanel").classList.toggle("hidden", !adminActionsVisible);
+  if (adminActionsVisible && el("absenceDate")) el("absenceDate").value = new Date().toISOString().slice(0, 10);
+
   const directVisible = ["admin", "teacher", "student"].includes(session.role);
   el("directChatPanel").classList.toggle("hidden", !directVisible);
   el("adminDirectTools").classList.toggle("hidden", session.role !== "admin");
@@ -965,7 +1110,11 @@ function renderDashboard() {
   renderSelectedStudentMembers();
   renderQuestionCard();
   renderDirectChats();
+  renderAdminStudentsByGrade();
+  renderNotifications();
   syncSettingsPanel();
+  syncNotificationsPanel();
+  enhancePanelsCollapsing();
   highlightSettingsChoices();
 }
 
@@ -1037,6 +1186,16 @@ document.addEventListener("click", (e) => {
     applyIconShape(e.target.dataset.iconShape);
   }
 
+  if (e.target.matches(".panel-collapse-btn")) {
+    const panelId = e.target.dataset.panelId;
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const collapsed = !panel.classList.contains("collapsed-panel");
+    panel.classList.toggle("collapsed-panel", collapsed);
+    e.target.textContent = collapsed ? "+" : "−";
+    setPanelCollapsed(panelId, collapsed);
+  }
+
   if (e.target.matches(".startDirectChat")) {
     startDirectChat(e.target.dataset.id);
   }
@@ -1083,6 +1242,12 @@ el("nextQuestion").addEventListener("click", nextQuestion);
 el("showAnswer").addEventListener("click", showAnswer);
 el("deleteMyAccount").addEventListener("click", deleteMyAccount);
 el("settingsToggle").addEventListener("click", toggleSettingsPanel);
+el("notificationsToggle").addEventListener("click", toggleNotificationsPanel);
+el("clearNotifications").addEventListener("click", () => { state.data.notifications[session.id] = []; saveData(); renderNotifications(); });
+el("changePasswordBtn").addEventListener("click", changePassword);
+el("adminTargetGrade").addEventListener("change", renderAdminStudentsByGrade);
+el("sendAbsence").addEventListener("click", sendAdminAbsence);
+el("sendWarning").addEventListener("click", sendAdminWarning);
 
 el("logoutBtn").addEventListener("click", () => {
   clearSession();
@@ -1099,6 +1264,7 @@ el("logoutBtn").addEventListener("click", () => {
   renderTeacherAssignmentPicker();
   renderSelectedMembers();
   state.data.settings.settingsOpen = false;
+  state.data.settings.notificationsOpen = false;
   setRole("student");
   setMode("register");
 });
@@ -1113,6 +1279,8 @@ setMode("register");
 applyTheme(state.data.settings.theme || "theme-green");
 applyIconShape(state.data.settings.iconShape || "icons-rounded");
 syncSettingsPanel();
+syncNotificationsPanel();
+enhancePanelsCollapsing();
 highlightSettingsChoices();
 
 if (session) renderDashboard();

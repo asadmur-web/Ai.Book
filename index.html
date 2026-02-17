@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; connect-src 'self';" />
     <title>Smart Sharia Education website | موقع التعليم الشرعي الذكي</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
@@ -98,6 +99,7 @@
             <p id="subtitle"></p>
           </div>
           <div class="actions">
+            <button id="notificationsToggle" class="btn icon-btn" type="button" title="الإشعارات">🔔</button>
             <button id="settingsToggle" class="btn icon-btn" type="button" aria-expanded="false" title="الإعدادات">⚙️</button>
             <button id="deleteMyAccount" class="btn">حذف حسابي</button>
             <button id="logoutBtn" class="btn danger">تسجيل خروج</button>
@@ -125,6 +127,13 @@
               <button class="btn icon-shape-btn" data-icon-shape="icons-rounded" type="button">دائري ناعم</button>
               <button class="btn icon-shape-btn" data-icon-shape="icons-square" type="button">مربع حديث</button>
             </div>
+            <p class="muted-note">تغيير كلمة المرور:</p>
+            <div class="compose">
+              <input id="currentPassword" type="password" placeholder="كلمة المرور الحالية" />
+              <input id="newPassword" type="password" placeholder="كلمة المرور الجديدة" />
+              <button id="changePasswordBtn" class="btn primary" type="button">تحديث كلمة المرور</button>
+              <p id="passwordMsg" class="msg"></p>
+            </div>
           </section>
 
           <section class="panel">
@@ -132,6 +141,13 @@
             <div id="teacherPostBox" class="hidden compose">
               <label>الصف <select id="postGrade"></select></label>
               <label>المادة <select id="postSubject"></select></label>
+              <label>نوع المنشور
+                <select id="postType">
+                  <option value="واجب">واجب</option>
+                  <option value="امتحان">امتحان</option>
+                  <option value="خبر مهم">خبر مهم</option>
+                </select>
+              </label>
               <textarea id="postText" placeholder="اكتب منشوراً للطلاب..."></textarea>
               <button id="publishTeacherPost" class="btn primary" type="button">نشر</button>
             </div>
@@ -143,6 +159,14 @@
               <button id="publishAdminPost" class="btn primary" type="button">نشر إداري</button>
             </div>
             <ul id="postList" class="list"></ul>
+          </section>
+
+
+
+          <section class="panel hidden" id="notificationsPanel">
+            <h3>الإشعارات</h3>
+            <ul id="notificationsList" class="list"></ul>
+            <button id="clearNotifications" class="btn" type="button">مسح الإشعارات</button>
           </section>
 
           <section class="panel" id="staffChatPanel">
@@ -276,6 +300,25 @@
                 <button id="nextQuestion" class="btn" type="button">سؤال جديد</button>
               </div>
               <p id="questionAnswer"></p>
+            </div>
+          </section>
+
+
+
+          <section class="panel hidden" id="adminAttendancePanel">
+            <h3>إدارة الغياب والتنبيهات</h3>
+            <div class="compose">
+              <label>الصف <select id="adminTargetGrade"></select></label>
+              <label>طلاب الصف <select id="adminTargetStudent"></select></label>
+              <label>تاريخ اليوم <input id="absenceDate" type="date"/></label>
+              <div class="inline-row">
+                <button id="sendAbsence" class="btn primary" type="button">إرسال غياب يوم</button>
+                <button id="sendWarning" class="btn" type="button">إرسال تنبيه</button>
+              </div>
+              <label>نص التنبيه
+                <textarea id="warningText" placeholder="اكتب التصرف أو الملاحظة..."></textarea>
+              </label>
+              <p id="adminActionMsg" class="msg"></p>
             </div>
           </section>
 
