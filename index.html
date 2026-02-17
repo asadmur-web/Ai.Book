@@ -185,9 +185,9 @@
             <h3>دردشة الطاقم المدرسي</h3>
             <div id="staffChatBox" class="hidden">
               <div id="staffMessages" class="messages"></div>
-              <div class="inline-row">
-                <input id="staffInput" type="text" placeholder="رسالة للطاقم..." />
-                <button id="sendStaffMessage" class="btn primary" type="button">إرسال</button>
+              <div class="inline-row search">
+                <input id="staffInput" class="search__input" type="text" placeholder="رسالة للطاقم..." />
+                <button id="sendStaffMessage" class="btn primary search__button" type="button">إرسال</button>
               </div>
             </div>
             <p id="staffHint">هذه الدردشة للمعلمين والإدارة فقط.</p>
@@ -199,9 +199,9 @@
               <input id="chatTitle" type="text" placeholder="اسم غرفة الدردشة" />
               <label>الصف <select id="chatGrade"></select></label>
               <label>المادة <select id="chatSubject"></select></label>
-              <div class="inline-row">
-                <input id="memberSearch" type="text" placeholder="بحث بالاسم أو ID" />
-                <button id="doSearch" class="btn" type="button">بحث</button>
+              <div class="inline-row search">
+                <input id="memberSearch" class="search__input" type="text" placeholder="بحث بالاسم أو ID" />
+                <button id="doSearch" class="btn search__button" type="button">بحث</button>
               </div>
               <ul id="searchResult" class="mini"></ul>
               <p>المشاركون:</p>
@@ -214,9 +214,9 @@
               <div id="chatConversation" class="hidden">
                 <h4 id="chatRoomTitle"></h4>
                 <div id="chatMessages" class="messages"></div>
-                <div class="inline-row">
-                  <input id="chatInput" type="text" placeholder="اكتب رسالة..." />
-                  <button id="sendMessage" class="btn primary" type="button">إرسال</button>
+                <div class="inline-row search">
+                  <input id="chatInput" class="search__input" type="text" placeholder="اكتب رسالة..." />
+                  <button id="sendMessage" class="btn primary search__button" type="button">إرسال</button>
                 </div>
               </div>
             </div>
@@ -226,9 +226,9 @@
             <h3>دردشات الطلاب (تحت مراقبة المرشد التربوي)</h3>
             <div id="studentChatCreator" class="hidden compose">
               <input id="studentChatTitle" type="text" placeholder="اسم دردشة الطلاب" />
-              <div class="inline-row">
-                <input id="studentMemberSearch" type="text" placeholder="ابحث عن طالب بالاسم أو ID" />
-                <button id="searchStudentMember" class="btn" type="button">بحث</button>
+              <div class="inline-row search">
+                <input id="studentMemberSearch" class="search__input" type="text" placeholder="ابحث عن طالب بالاسم أو ID" />
+                <button id="searchStudentMember" class="btn search__button" type="button">بحث</button>
               </div>
               <ul id="studentSearchResult" class="mini"></ul>
               <p>الأعضاء:</p>
@@ -246,9 +246,9 @@
               <div id="studentChatConversation" class="hidden">
                 <h4 id="studentChatRoomTitle"></h4>
                 <div id="studentChatMessages" class="messages"></div>
-                <div class="inline-row">
-                  <input id="studentChatInput" type="text" placeholder="رسالة في دردشة الطلاب..." />
-                  <button id="sendStudentMessage" class="btn primary" type="button">إرسال</button>
+                <div class="inline-row search">
+                  <input id="studentChatInput" class="search__input" type="text" placeholder="رسالة في دردشة الطلاب..." />
+                  <button id="sendStudentMessage" class="btn primary search__button" type="button">إرسال</button>
                 </div>
               </div>
             </div>
@@ -260,9 +260,9 @@
           <section class="panel" id="directChatPanel">
             <h3>الدردشة المباشرة مع الإدارة</h3>
             <div id="adminDirectTools" class="hidden compose">
-              <div class="inline-row">
-                <input id="directChatSearch" type="text" placeholder="ابحث باسم أو ID أو بريد" />
-                <button id="doDirectSearch" class="btn" type="button">بحث</button>
+              <div class="inline-row search">
+                <input id="directChatSearch" class="search__input" type="text" placeholder="ابحث باسم أو ID أو بريد" />
+                <button id="doDirectSearch" class="btn search__button" type="button">بحث</button>
               </div>
               <ul id="directSearchResults" class="mini"></ul>
             </div>
@@ -271,9 +271,9 @@
               <div id="directChatConversation" class="hidden">
                 <h4 id="directChatTitle"></h4>
                 <div id="directChatMessages" class="messages"></div>
-                <div class="inline-row">
-                  <input id="directChatInput" type="text" placeholder="اكتب رسالة مباشرة..." />
-                  <button id="sendDirectMessage" class="btn primary" type="button">إرسال</button>
+                <div class="inline-row search">
+                  <input id="directChatInput" class="search__input" type="text" placeholder="اكتب رسالة مباشرة..." />
+                  <button id="sendDirectMessage" class="btn primary search__button" type="button">إرسال</button>
                 </div>
               </div>
             </div>
