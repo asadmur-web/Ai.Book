@@ -36,6 +36,7 @@ function esc(v) {
 }
 function uid(prefix = "id") { return `${prefix}-${Math.random().toString(36).slice(2, 10)}`; }
 function sanitizeText(text) { return String(text || "").trim().slice(0, MAX_INPUT_LEN); }
+function normText(v) { return String(v || "").trim(); }
 function validId(id) { return /^[A-Z]{2}\d{4}$/.test(id); }
 function validEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email); }
 function emailExists(email) { return state.data.users.some((u) => (u.email || "").toLowerCase() === email.toLowerCase()); }
@@ -372,7 +373,7 @@ function updateTeacherSubjectSelectors() {
 
 function updateGradebookSubjectSelector() {
   if (session.role !== "teacher") return;
-  const grade = el("gradebookGrade").value;
+  const grade = normText(el("gradebookGrade").value);
   el("gradebookSubject").innerHTML = (session.assignments[grade] || []).map((s) => `<option value="${s}">${s}</option>`).join("");
   renderTeacherGradebook();
 }
@@ -393,9 +394,9 @@ function visiblePosts() {
   if (session.role === "admin") return state.data.posts;
   if (session.role === "teacher") {
     const myGrades = Object.keys(session.assignments || {});
-    return state.data.posts.filter((p) => p.audience === "global" || p.authorId === session.id || (p.audience === "grade" && myGrades.includes(p.grade)));
+    return state.data.posts.filter((p) => p.audience === "global" || p.authorId === session.id || ((p.audience === "grade" || p.audience === "targeted") && myGrades.map(normText).includes(normText(p.grade))));
   }
-  return state.data.posts.filter((p) => p.audience === "global" || (p.audience === "grade" && p.grade === session.grade));
+  return state.data.posts.filter((p) => p.audience === "global" || ((p.audience === "grade" || p.audience === "targeted") && normText(p.grade) === normText(session.grade)));
 }
 
 function renderPosts() {
@@ -413,13 +414,15 @@ function renderPosts() {
 }
 
 function publishTeacherPost() {
-  const grade = el("postGrade").value;
+  const grade = normText(el("postGrade").value);
   const subject = el("postSubject").value;
   const text = sanitizeText(el("postText").value);
   const postType = el("postType").value;
   if (!text || !session.assignments[grade]?.includes(subject)) return;
   state.data.posts.unshift({ id: uid("p"), audience: "targeted", type: postType, authorId: session.id, authorName: session.fullName, grade, subject, text });
-  const targets = state.data.users.filter((u) => u.role === "student" && u.grade === grade).map((u) => u.id);
+  const targets = state.data.users
+    .filter((u) => u.role === "student" && normText(u.grade) === normText(grade))
+    .map((u) => u.id);
   pushNotification(targets, `منشور ${postType} جديد في ${subject} - صف ${grade}`, "post");
   el("postText").value = "";
   saveData();
@@ -427,12 +430,14 @@ function publishTeacherPost() {
 }
 
 function publishAdminPost() {
-  const grade = el("adminPostGrade").value;
+  const grade = normText(el("adminPostGrade").value);
   const text = sanitizeText(el("adminPostText").value);
   if (!text) return;
   const audience = grade === "all" ? "global" : "grade";
   state.data.posts.unshift({ id: uid("p"), audience, type: "إعلان إداري", authorId: session.id, authorName: session.fullName, grade, subject: "إدارة مدرسية", text });
-  const targets = state.data.users.filter((u) => audience === "global" ? true : u.grade === grade).map((u) => u.id);
+  const targets = state.data.users
+    .filter((u) => audience === "global" ? true : normText(u.grade) === normText(grade))
+    .map((u) => u.id);
   pushNotification(targets, "إعلان إداري جديد", "admin");
   el("adminPostText").value = "";
   saveData();
@@ -647,10 +652,10 @@ function getMarkEntry(studentId, grade, subject, semester) {
 
 function renderTeacherGradebook() {
   if (session.role !== "teacher") return;
-  const grade = el("gradebookGrade").value;
+  const grade = normText(el("gradebookGrade").value);
   const subject = el("gradebookSubject").value;
   const semester = el("gradebookSemester").value;
-  const students = state.data.users.filter((u) => u.role === "student" && u.grade === grade);
+  const students = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === grade);
   const schema = gradeSchema(subject);
 
   el("teacherGradebookTable").innerHTML = students.length ? `
@@ -690,7 +695,7 @@ function renderTeacherGradebook() {
 
 function saveTeacherMarks() {
   if (session.role !== "teacher") return;
-  const grade = el("gradebookGrade").value;
+  const grade = normText(el("gradebookGrade").value);
   const subject = el("gradebookSubject").value;
   const semester = el("gradebookSemester").value;
   const schema = gradeSchema(subject);
@@ -729,9 +734,9 @@ function saveTeacherMarks() {
 
 function renderStudentGradebook() {
   if (session.role !== "student") return;
-  const grade = session.grade;
+  const grade = normText(session.grade);
   const taughtSubjects = [...new Set(Object.keys(state.data.teacherAssignmentsByGradeSubject)
-    .filter((k) => k.startsWith(`${grade}|`))
+    .filter((k) => normText(k.split("|")[0]) === normText(grade))
     .map((k) => k.split("|")[1]))];
 
   const allSubjects = taughtSubjects.length ? taughtSubjects : subjectsForGrade(grade);
@@ -990,7 +995,7 @@ function registerUser() {
 
   if (role === "student") {
     if (el("studentSecret").value.trim() !== STUDENT_SECRET) return "الرمز السري للطالب غير صحيح.";
-    const grade = el("studentGrade").value;
+    const grade = normText(el("studentGrade").value);
     state.data.users.push({ id, fullName, role: "student", grade, email, password });
     session = { id, fullName, role: "student", grade, email };
   }
@@ -1066,7 +1071,7 @@ function changePassword() {
 function renderAdminStudentsByGrade() {
   if (session?.role !== "admin") return;
   const grade = el("adminTargetGrade")?.value;
-  const students = state.data.users.filter((u) => u.role === "student" && u.grade === grade);
+  const students = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === grade);
   const select = el("adminTargetStudent");
   if (!select) return;
   select.innerHTML = students.map((s) => `<option value="${s.id}">${esc(s.fullName)} (${esc(s.id)})</option>`).join("");

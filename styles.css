@@ -171,6 +171,10 @@ textarea { min-height: 88px; }
   padding: 0.55rem;
 }
 
+.grade-table-wrap {
+  overflow-x: auto;
+}
+
 .inline-row {
   display: flex;
   gap: 0.45rem;
@@ -249,6 +253,17 @@ textarea { min-height: 88px; }
   .actions { width: 100%; }
   .actions .btn { width: 100%; }
   .icon-btn { width: 100%; height: 40px; }
+}
+
+
+@media (max-width: 680px) {
+  .chat-grid { gap: 0.45rem; }
+  .messages { min-height: 140px; max-height: 210px; }
+  .grade-table th, .grade-table td { padding: 0.35rem; font-size: 0.86rem; }
+  .grade-input { width: 72px; }
+  .subject-grid { grid-template-columns: 1fr; }
+  .search { width: 100%; }
+  .search__input { width: 100%; min-width: 0; margin-right: 0; }
 }
 
 
@@ -538,12 +553,18 @@ body.theme-black {
 
 @media (max-width: 680px) {
   .search {
-    flex-direction: row;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.4rem;
   }
 
   .search__input {
     width: 100%;
-    margin-inline-end: -0.3rem;
+    margin-inline-end: 0;
+  }
+
+  .search__button {
+    width: 100%;
   }
 }
 
