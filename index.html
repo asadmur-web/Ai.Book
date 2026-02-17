@@ -34,8 +34,20 @@
           </div>
 
           <div class="tabs" id="modeTabs">
-            <button class="tab active" data-mode="register">تسجيل جديد</button>
-            <button class="tab" data-mode="login">مسجل دخول</button>
+            <button class="tab active" data-mode="register">
+              <span class="mode-tab-content">تسجيل جديد</span>
+              <span class="container mode-check">
+                <input type="checkbox" aria-hidden="true" tabindex="-1" />
+                <span class="checkmark"></span>
+              </span>
+            </button>
+            <button class="tab" data-mode="login">
+              <span class="mode-tab-content">مسجل دخول</span>
+              <span class="container mode-check">
+                <input type="checkbox" aria-hidden="true" tabindex="-1" />
+                <span class="checkmark"></span>
+              </span>
+            </button>
           </div>
 
           <form id="authForm" class="form-grid">

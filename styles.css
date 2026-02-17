@@ -395,3 +395,87 @@ body.theme-black {
 .notif.admin { border-inline-start-color: #d97b7b; }
 .notif.security { border-inline-start-color: #b084ff; }
 .notif.post { border-inline-start-color: #6dd7ad; }
+
+
+/* Uiverse-style checkmark for login/register mode tabs */
+.mode-tab-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.mode-check.container input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.mode-check.container {
+  display: inline-flex;
+  position: relative;
+  cursor: pointer;
+  font-size: 1.2rem;
+  user-select: none;
+  margin-inline-start: 0.45rem;
+}
+
+.mode-check .checkmark {
+  --clr: #0B6E4F;
+  position: relative;
+  top: 0;
+  left: 0;
+  height: 1.3em;
+  width: 1.3em;
+  background-color: #ccc;
+  border-radius: 50%;
+  transition: 300ms;
+}
+
+.mode-check.container input:checked ~ .checkmark {
+  background-color: var(--clr);
+  border-radius: .5rem;
+  animation: pulse 500ms ease-in-out;
+}
+
+.mode-check .checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+}
+
+.mode-check.container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.mode-check.container .checkmark:after {
+  left: 0.45em;
+  top: 0.25em;
+  width: 0.25em;
+  height: 0.5em;
+  border: solid #E0E0E2;
+  border-width: 0 0.15em 0.15em 0;
+  transform: rotate(45deg);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 #0B6E4F90;
+    rotate: 20deg;
+  }
+
+  50% {
+    rotate: -20deg;
+  }
+
+  75% {
+    box-shadow: 0 0 0 10px #0B6E4F60;
+  }
+
+  100% {
+    box-shadow: 0 0 0 13px #0B6E4F30;
+    rotate: 0;
+  }
+}

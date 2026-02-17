@@ -244,7 +244,12 @@ function setRole(role) {
 
 function setMode(mode) {
   state.mode = mode;
-  modeTabs.forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+  modeTabs.forEach((b) => {
+    const active = b.dataset.mode === mode;
+    b.classList.toggle("active", active);
+    const box = b.querySelector(".mode-check input");
+    if (box) box.checked = active;
+  });
   applyAuthLayout();
 }
 
