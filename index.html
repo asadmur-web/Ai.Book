@@ -7,13 +7,13 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="bg-orbs"></div>
+  <div class="aurora"></div>
   <header class="topbar">
     <div class="brand">
-      <div class="logo">⚑</div>
+      <div class="logo-wrap"><span id="brandIcon">🎓</span></div>
       <div>
         <h1>موقع التعليم الشرعي الذكي</h1>
-        <p>منصة مدرسية احترافية للطلاب والمعلمين والإدارة</p>
+        <p>بيئة مدرسية احترافية للطلاب والمعلمين والإدارة</p>
       </div>
     </div>
     <div id="sessionBox"></div>
@@ -22,32 +22,32 @@
   <main id="app"></main>
 
   <template id="authTemplate">
-    <section class="auth-grid">
-      <article class="card glass">
-        <h2>تسجيل حساب جديد</h2>
-        <div class="tabs">
+    <section class="auth-layout">
+      <article class="panel card">
+        <h2>إنشاء حساب جديد</h2>
+        <div class="role-tabs">
           <button data-tab="student" class="active">طالب</button>
           <button data-tab="teacher">معلم</button>
           <button data-tab="admin">إدارة مدرسية</button>
         </div>
-        <form id="registerForm"></form>
+        <form id="registerForm" class="stack"></form>
       </article>
 
-      <article class="card glass">
+      <article class="panel card">
         <h2>تسجيل الدخول</h2>
         <form id="loginForm" class="stack">
           <label>البريد الإلكتروني أو ID<input name="identifier" required /></label>
           <label>كلمة المرور<input name="password" type="password" required /></label>
-          <button class="primary">دخول</button>
+          <button class="btn btn-primary">دخول</button>
         </form>
-        <p class="hint">إذا كان الحساب موجوداً مسبقاً سيتم توجيهك مباشرة لتسجيل الدخول.</p>
+        <p class="hint">إذا لديك حساب مسبقًا، استخدم تسجيل الدخول مباشرة.</p>
       </article>
     </section>
   </template>
 
   <template id="dashboardTemplate">
     <section class="dashboard">
-      <aside class="sidebar card glass" id="sideMenu"></aside>
+      <aside class="sidebar card" id="sideMenu"></aside>
       <section class="content" id="content"></section>
     </section>
   </template>
