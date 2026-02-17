@@ -405,7 +405,9 @@ function renderPosts() {
       const title = p.audience === "global" ? "إعلان إداري عام" : p.audience === "grade" ? `إعلان إداري لصف ${esc(p.grade)}` : `${esc(p.grade)} - ${esc(p.subject)}`;
       const type = p.type || "منشور";
       const cls = type === "واجب" ? "type-homework" : type === "امتحان" ? "type-exam" : "type-important";
-      return `<li><strong>${title}</strong> <span class="post-type ${cls}">${esc(type)}</span><p>${esc(p.text)}</p><small>${esc(p.authorName)}</small></li>`;
+      const canDeleteQuestion = session.role === "teacher" && p.authorId === session.id && ["واجب", "امتحان"].includes(type);
+      const delBtn = canDeleteQuestion ? `<button class="btn danger tiny deleteTeacherPost" data-id="${p.id}" type="button">حذف السؤال</button>` : "";
+      return `<li><strong>${title}</strong> <span class="post-type ${cls}">${esc(type)}</span>${delBtn}<p>${esc(p.text)}</p><small>${esc(p.authorName)}</small></li>`;
     }).join("")
     : "<li>لا توجد منشورات.</li>";
 }
@@ -433,6 +435,16 @@ function publishAdminPost() {
   const targets = state.data.users.filter((u) => audience === "global" ? true : u.grade === grade).map((u) => u.id);
   pushNotification(targets, "إعلان إداري جديد", "admin");
   el("adminPostText").value = "";
+  saveData();
+  renderPosts();
+}
+
+
+function deleteTeacherPost(postId) {
+  if (session?.role !== "teacher") return;
+  const target = state.data.posts.find((p) => p.id === postId);
+  if (!target || target.authorId !== session.id) return;
+  state.data.posts = state.data.posts.filter((p) => p.id !== postId);
   saveData();
   renderPosts();
 }
@@ -1241,6 +1253,10 @@ document.addEventListener("click", (e) => {
   if (e.target.matches(".openDirectChat")) {
     state.selectedDirectChatId = e.target.dataset.id;
     renderDirectConversation();
+  }
+
+  if (e.target.matches(".deleteTeacherPost")) {
+    deleteTeacherPost(e.target.dataset.id);
   }
 
   if (e.target.matches(".deleteUser") && canAdminDelete()) {
