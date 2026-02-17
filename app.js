@@ -84,6 +84,15 @@ function syncDataFromStorage() {
   const fresh = normalizeData(safeParse(localStorage.getItem("aiBookData") || "{}", {}));
   state.data = fresh;
   ensureSessionStillValid();
+  if (session) {
+    const active = state.data.users.find((u) => u.id === session.id);
+    if (active) {
+      if (active.role === "student") session = { id: active.id, fullName: active.fullName, role: "student", grade: active.grade, email: active.email };
+      if (active.role === "teacher") session = { id: active.id, fullName: active.fullName, role: "teacher", email: active.email, assignments: active.assignments || {} };
+      if (active.role === "admin") session = { id: active.id, fullName: active.fullName, role: "admin", position: active.position, email: active.email };
+      saveSession(session);
+    }
+  }
 }
 
 const state = {
@@ -102,10 +111,33 @@ const state = {
 state.data = normalizeData(state.data);
 
 let session = safeParse(localStorage.getItem("aiBookSession"), null);
+let liveSyncTimer = null;
 
 function saveData() { localStorage.setItem("aiBookData", JSON.stringify(state.data)); }
 function saveSession(s) { localStorage.setItem("aiBookSession", JSON.stringify(s)); }
 function clearSession() { localStorage.removeItem("aiBookSession"); }
+
+function stopLiveSync() {
+  if (liveSyncTimer) {
+    clearInterval(liveSyncTimer);
+    liveSyncTimer = null;
+  }
+}
+
+function startLiveSync() {
+  stopLiveSync();
+  liveSyncTimer = setInterval(() => {
+    if (!session) return;
+    syncDataFromStorage();
+    renderPosts();
+    if (session.role === "teacher") renderTeacherGradebook();
+    if (session.role === "student") renderStudentGradebook();
+    renderNotifications();
+    renderChatRooms();
+    renderStudentChatRooms();
+    renderDirectChatRooms();
+  }, 1800);
+}
 
 function applyTheme(theme) {
   const chosen = theme || "theme-green";
@@ -211,21 +243,7 @@ function enhancePanelsCollapsing() {
 }
 
 function resetDataForPublish() {
-  const flag = "aiBookPublishResetV3";
-  if (localStorage.getItem(flag)) return;
-
-  state.data.users = [];
-  state.data.posts = [];
-  state.data.chats = [];
-  state.data.staffMessages = [];
-  state.data.teacherAssignmentsByGradeSubject = {};
-  state.data.marks = {};
-  state.data.studentChats = [];
-  state.data.directChats = [];
-  clearSession();
-  session = null;
-  localStorage.setItem(flag, "1");
-  saveData();
+  // Disabled: preserving real user data is required for continuous operation.
 }
 
 function ensureSessionStillValid() {
@@ -660,7 +678,7 @@ function renderTeacherGradebook() {
   const grade = normText(el("gradebookGrade").value);
   const subject = el("gradebookSubject").value;
   const semester = el("gradebookSemester").value;
-  const students = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === grade);
+  const students = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === normText(grade));
   const schema = gradeSchema(subject);
 
   el("teacherGradebookTable").innerHTML = students.length ? `
@@ -962,6 +980,7 @@ function removeAccount(id) {
 
 function deleteMyAccount() {
   removeAccount(session.id);
+  stopLiveSync();
   clearSession();
   session = null;
   state.selectedMembers = [];
@@ -1078,7 +1097,7 @@ function changePassword() {
 function renderAdminStudentsByGrade() {
   if (session?.role !== "admin") return;
   const grade = el("adminTargetGrade")?.value;
-  const students = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === grade);
+  const students = state.data.users.filter((u) => u.role === "student" && normText(u.grade) === normText(grade));
   const select = el("adminTargetStudent");
   if (!select) return;
   select.innerHTML = students.map((s) => `<option value="${s.id}">${esc(s.fullName)} (${esc(s.id)})</option>`).join("");
@@ -1116,6 +1135,7 @@ function sendAdminWarning() {
 
 function renderDashboard() {
   syncDataFromStorage();
+  startLiveSync();
   el("loginScreen").classList.add("hidden");
   el("dashboard").classList.remove("hidden");
   el("welcome").textContent = `مرحباً ${session.fullName}`;
@@ -1318,6 +1338,7 @@ el("sendWarning").addEventListener("click", sendAdminWarning);
 el("startCounselorChat").addEventListener("click", startCounselorChat);
 
 el("logoutBtn").addEventListener("click", () => {
+  stopLiveSync();
   clearSession();
   session = null;
   state.selectedMembers = [];
@@ -1337,7 +1358,6 @@ el("logoutBtn").addEventListener("click", () => {
   setMode("register");
 });
 
-resetDataForPublish();
 ensureSessionStillValid();
 renderLoginSetup();
 renderSelectedMembers();
