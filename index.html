@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>موقع التعليم الشرعي الذكي</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="aurora"></div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-wrap"><span id="brandIcon">🎓</span></div>
+      <div>
+        <h1>موقع التعليم الشرعي الذكي</h1>
+        <p>بيئة مدرسية احترافية للطلاب والمعلمين والإدارة</p>
+      </div>
+    </div>
+    <div id="sessionBox"></div>
+  </header>
+
+  <main id="app"></main>
+
+  <template id="authTemplate">
+    <section class="auth-layout">
+      <article class="panel card">
+        <h2>إنشاء حساب جديد</h2>
+        <div class="role-tabs">
+          <button data-tab="student" class="active">طالب</button>
+          <button data-tab="teacher">معلم</button>
+          <button data-tab="admin">إدارة مدرسية</button>
+        </div>
+        <form id="registerForm" class="stack"></form>
+      </article>
+
+      <article class="panel card">
+        <h2>تسجيل الدخول</h2>
+        <form id="loginForm" class="stack">
+          <label>البريد الإلكتروني أو ID<input name="identifier" required /></label>
+          <label>كلمة المرور<input name="password" type="password" required /></label>
+          <button class="btn btn-primary">دخول</button>
+        </form>
+        <p class="hint">إذا لديك حساب مسبقًا، استخدم تسجيل الدخول مباشرة.</p>
+      </article>
+    </section>
+  </template>
+
+  <template id="dashboardTemplate">
+    <section class="dashboard">
+      <aside class="sidebar card" id="sideMenu"></aside>
+      <section class="content" id="content"></section>
+    </section>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
