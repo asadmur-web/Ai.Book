@@ -2,13 +2,14 @@ const app = document.getElementById('app');
 const sessionBox = document.getElementById('sessionBox');
 const brandIcon = document.getElementById('brandIcon');
 
-const DB_KEY = 'smart-school-db-v3';
+const DB_KEY = 'smart-school-db-v4';
 const SESSION_KEY = 'smart-school-session';
 
 const grades = ['السادس','السابع','الثامن','التاسع','العاشر'];
 const subjects69 = ['اللغة العربية','اللغة الانجليزية','التربية الاسلامية','التكنولوجيا و البرمجة','المواد الشرعية','الرياضيات','العلوم','الدراسات الاجتماعية','التربية البدنية'];
 const subjects10 = ['اللغة العربية','اللغة الانجليزية','التربية الاسلامية','التكنولوجيا و البرمجة','المواد الشرعية','الرياضيات','فيزياء','كيمياء','احياء','الدراسات الاجتماعية','التربية البدنية'];
 const adminJobs = ['مدير','نائب مدير','سكرتير','مرشد تربوي'];
+const semesters = ['الفصل الأول', 'الفصل الثاني'];
 const allSubjects = [...new Set([...subjects69, ...subjects10])];
 
 const secretDigests = { student: 'MzAyMDE=', teacher: 'OTUxOTUx', admin: 'MjUxMjAxMQ==' };
@@ -22,6 +23,40 @@ const getUser = id => db.users.find(u => u.id === id);
 const genId = role => `${role[0].toUpperCase()}${Math.floor(100000 + Math.random() * 900000)}`;
 const pwValid = p => /^(?=(?:.*\d){7,})(?=(?:.*[A-Za-z]){2,}).{9,}$/.test(p || '');
 const subjectsByGrade = grade => grade === 'العاشر' ? subjects10 : subjects69;
+
+function blankGradeEntry(studentId, semester, subject) {
+  return { studentId, semester, subject, d1: null, m: null, d2: null, f: null, q: null, total: null, updatedAt: Date.now() };
+}
+
+function calcTotal(entry) {
+  const n = k => Number(entry[k] ?? 0);
+  let total = n('d1') + n('m') + n('d2') + n('f') + n('q');
+  if (entry.subject === 'المواد الشرعية') total *= 2;
+  return total;
+}
+
+function ensureStudentGradeRecords(studentId, grade) {
+  const subjects = subjectsByGrade(grade);
+  semesters.forEach(semester => {
+    subjects.forEach(subject => {
+      const exists = db.grades.some(g => g.studentId === studentId && g.semester === semester && g.subject === subject);
+      if (!exists) db.grades.push(blankGradeEntry(studentId, semester, subject));
+    });
+  });
+}
+
+function migrateGrades() {
+  db.grades = db.grades.map(g => ({
+    d1: g.d1 ?? null,
+    m: g.m ?? null,
+    d2: g.d2 ?? null,
+    f: g.f ?? null,
+    q: g.q ?? null,
+    total: g.total ?? null,
+    updatedAt: g.updatedAt ?? Date.now(),
+    ...g
+  }));
+}
 
 function generateQuestionBank() {
   const stems = ['ما تعريف', 'اذكر مثالاً على', 'ما أهمية', 'كيف تفسر', 'ما الفرق بين'];
@@ -42,6 +77,8 @@ function ensureDefaults() {
   if (!db.chatRooms.some(r => r.id === 'staff-room')) {
     db.chatRooms.push({ id: 'staff-room', name: 'طاقم المدرسة', type: 'staff', creatorId: 'system', memberIds: [] });
   }
+  migrateGrades();
+  db.users.filter(u => u.role === 'student' && u.grade).forEach(s => ensureStudentGradeRecords(s.id, s.grade));
 }
 ensureDefaults();
 save();
@@ -126,17 +163,14 @@ function renderAuth() {
       subjects: f.getAll('subjects').slice(0, 2),
       gradeList: f.getAll('gradeList'),
       job: f.get('job') || null,
-      theme: '#157347',
-      bg: '#eff5f1',
-      icon: '🎓',
-      iconShape: 'rounded',
-      muted: false
+      theme: '#157347', bg: '#eff5f1', icon: '🎓', iconShape: 'rounded', muted: false
     };
 
     if (role === 'teacher' && user.subjects.length < 1) return alert('اختر مادة واحدة على الأقل.');
     if (role === 'teacher' && user.gradeList.length < 1) return alert('اختر صفاً واحداً على الأقل.');
 
     db.users.push(user);
+    if (role === 'student') ensureStudentGradeRecords(user.id, user.grade);
     save();
     session = { id: user.id };
     saveSession();
@@ -190,7 +224,7 @@ function renderDashboard() {
     const rand = questionBank[Math.floor(Math.random() * questionBank.length)];
     const studentQ = me.role === 'student' ? card('بطاقات الأسئلة', `
       <div class="question">
-        <p><b>سؤال:</b> <span id="qTxt">${rand.q}</span></p>
+        <p><b>سؤال:</b> <span>${rand.q}</span></p>
         <div class="inline">
           <button id="showA" class="btn">إظهار الإجابة</button>
           <button id="nextQ" class="btn">السؤال التالي</button>
@@ -297,16 +331,20 @@ function renderDashboard() {
     };
   }
 
-  function gradeOf(studentId, semester, subject) {
-    const g = db.grades.find(x => x.studentId===studentId && x.semester===semester && x.subject===subject);
-    return g ? g.total : '';
+  function drawStudentSemesterTable(studentId, semester, studentGrade) {
+    const subjects = subjectsByGrade(studentGrade);
+    const rows = subjects.map(subject => {
+      const g = db.grades.find(x => x.studentId===studentId && x.semester===semester && x.subject===subject) || blankGradeEntry(studentId, semester, subject);
+      return `<tr><td>${subject}</td><td>${g.d1 ?? ''}</td><td>${g.m ?? ''}</td><td>${g.d2 ?? ''}</td><td>${g.f ?? ''}</td><td>${g.q ?? ''}</td><td>${g.total ?? ''}</td></tr>`;
+    }).join('');
+    return `<h4>${semester}</h4><div class="table-wrap"><table><tr><th>المادة</th><th>يومي 1 / 10</th><th>شهرين / 20</th><th>يومي 2 / 10</th><th>نهائي / 40</th><th>تقويم / 20</th><th>المجموع</th></tr>${rows}</table></div>`;
   }
 
   function drawGrades() {
     if (me.role === 'student') {
-      const subjects = subjectsByGrade(me.grade);
-      const rows = subjects.map(s => `<tr><td>${s}</td><td>${gradeOf(me.id,'الفصل الأول',s)}</td><td>${gradeOf(me.id,'الفصل الثاني',s)}</td></tr>`).join('');
-      content.innerHTML = card('سجل العلامات', `<div class="table-wrap"><table><tr><th>المادة</th><th>الفصل الأول</th><th>الفصل الثاني</th></tr>${rows}</table></div>`);
+      ensureStudentGradeRecords(me.id, me.grade);
+      save();
+      content.innerHTML = card('سجل العلامات المقسّم', `${drawStudentSemesterTable(me.id, 'الفصل الأول', me.grade)}${drawStudentSemesterTable(me.id, 'الفصل الثاني', me.grade)}`);
       return;
     }
 
@@ -314,9 +352,9 @@ function renderDashboard() {
       const students = db.users.filter(u => u.role === 'student' && me.gradeList.includes(u.grade));
       content.innerHTML = card('إدخال العلامات', `
         <form id="gradeForm" class="grid">
-          <label>اختر الطالب<select name="studentId">${students.map(s=>`<option value="${s.id}">${s.name} (${s.grade})</option>`).join('')}</select></label>
+          <label>اختر الطالب<select id="studentId" name="studentId">${students.map(s=>`<option value="${s.id}">${s.name} (${s.grade})</option>`).join('')}</select></label>
           <label>الفصل<select name="semester"><option>الفصل الأول</option><option>الفصل الثاني</option></select></label>
-          <label>المادة<select name="subject">${me.subjects.map(s=>`<option>${s}</option>`).join('')}</select></label>
+          <label>المادة<select id="subjectSel" name="subject">${me.subjects.map(s=>`<option>${s}</option>`).join('')}</select></label>
           <label>يومي1/10<input type="number" min="0" max="10" name="d1" /></label>
           <label>شهرين/20<input type="number" min="0" max="20" name="m" /></label>
           <label>يومي2/10<input type="number" min="0" max="10" name="d2" /></label>
@@ -326,24 +364,39 @@ function renderDashboard() {
         </form>
       `);
 
-      document.getElementById('gradeForm').onsubmit = e => {
+      const gradeForm = document.getElementById('gradeForm');
+      gradeForm.onsubmit = e => {
         e.preventDefault();
-        const f = new FormData(e.target);
-        const n = k => Number(f.get(k) || 0);
-        let total = n('d1') + n('m') + n('d2') + n('f') + n('q');
-        if (f.get('subject') === 'المواد الشرعية') total *= 2;
+        const f = new FormData(gradeForm);
+        const studentId = f.get('studentId');
+        const semester = f.get('semester');
+        const subject = f.get('subject');
+        const student = getUser(studentId);
+        ensureStudentGradeRecords(studentId, student.grade);
 
-        const payload = { studentId: f.get('studentId'), teacherId: me.id, semester: f.get('semester'), subject: f.get('subject'), total };
-        const idx = db.grades.findIndex(g => g.studentId===payload.studentId && g.semester===payload.semester && g.subject===payload.subject);
-        if (idx >= 0) db.grades[idx] = payload; else db.grades.push(payload);
+        const idx = db.grades.findIndex(g => g.studentId===studentId && g.semester===semester && g.subject===subject);
+        const current = idx >= 0 ? db.grades[idx] : blankGradeEntry(studentId, semester, subject);
+
+        const val = key => {
+          const raw = f.get(key);
+          return raw === '' ? current[key] : Number(raw);
+        };
+
+        const updated = { ...current, d1: val('d1'), m: val('m'), d2: val('d2'), f: val('f'), q: val('q') };
+        updated.total = calcTotal(updated);
+        updated.updatedAt = Date.now();
+
+        if (idx >= 0) db.grades[idx] = updated;
+        else db.grades.push(updated);
+
         save();
-        alert('تم حفظ العلامة.');
+        alert('تم حفظ العلامة وتحديث السجل تلقائياً.');
       };
       return;
     }
 
-    const rows = db.grades.map(g => `<tr><td>${getUser(g.studentId)?.name || g.studentId}</td><td>${g.semester}</td><td>${g.subject}</td><td>${g.total}</td></tr>`).join('');
-    content.innerHTML = card('متابعة العلامات للإدارة', `<div class="table-wrap"><table><tr><th>الطالب</th><th>الفصل</th><th>المادة</th><th>العلامة</th></tr>${rows}</table></div>`);
+    const rows = db.grades.map(g => `<tr><td>${getUser(g.studentId)?.name || g.studentId}</td><td>${g.semester}</td><td>${g.subject}</td><td>${g.d1 ?? ''}</td><td>${g.m ?? ''}</td><td>${g.d2 ?? ''}</td><td>${g.f ?? ''}</td><td>${g.q ?? ''}</td><td>${g.total ?? ''}</td></tr>`).join('');
+    content.innerHTML = card('متابعة العلامات للإدارة', `<div class="table-wrap"><table><tr><th>الطالب</th><th>الفصل</th><th>المادة</th><th>يومي1</th><th>شهرين</th><th>يومي2</th><th>نهائي</th><th>تقويم</th><th>المجموع</th></tr>${rows}</table></div>`);
   }
 
   function drawNotifications() {
@@ -371,23 +424,11 @@ function renderDashboard() {
 
       function drawNotify(mode) {
         if (mode === 'absence') {
-          form.innerHTML = `
-            <label>الطالب<select name="to">${studentOptions}</select></label>
-            <label>تاريخ الغياب<input type="date" name="date" required /></label>
-            <button class="btn btn-primary">إرسال إشعار الغياب</button>
-          `;
+          form.innerHTML = `<label>الطالب<select name="to">${studentOptions}</select></label><label>تاريخ الغياب<input type="date" name="date" required /></label><button class="btn btn-primary">إرسال إشعار الغياب</button>`;
         } else if (mode === 'alert') {
-          form.innerHTML = `
-            <label>الطالب<select name="to">${studentOptions}</select></label>
-            <label>سبب التنبيه<textarea name="text" required></textarea></label>
-            <button class="btn btn-primary">إرسال التنبيه</button>
-          `;
+          form.innerHTML = `<label>الطالب<select name="to">${studentOptions}</select></label><label>سبب التنبيه<textarea name="text" required></textarea></label><button class="btn btn-primary">إرسال التنبيه</button>`;
         } else {
-          form.innerHTML = `
-            <label>الإرسال إلى<select name="to"><option value="all">الجميع</option>${grades.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></label>
-            <label>المحتوى<textarea name="text" required></textarea></label>
-            <button class="btn btn-primary">إرسال</button>
-          `;
+          form.innerHTML = `<label>الإرسال إلى<select name="to"><option value="all">الجميع</option>${grades.map(g=>`<option value="${g}">${g}</option>`).join('')}</select></label><label>المحتوى<textarea name="text" required></textarea></label><button class="btn btn-primary">إرسال</button>`;
         }
 
         form.onsubmit = e => {
@@ -463,7 +504,7 @@ function renderDashboard() {
     document.getElementById('deleteAccountBtn').onclick = () => {
       if (!confirm('تأكيد حذف الحساب؟')) return;
       db.users = db.users.filter(u => u.id !== me.id);
-      db.grades = db.grades.filter(g => g.studentId !== me.id && g.teacherId !== me.id);
+      db.grades = db.grades.filter(g => g.studentId !== me.id);
       save();
       session = null;
       saveSession();
