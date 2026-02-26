@@ -23,6 +23,12 @@ const getUser = id => db.users.find(u => u.id === id);
 const genId = role => `${role[0].toUpperCase()}${Math.floor(100000 + Math.random() * 900000)}`;
 const pwValid = p => /^(?=(?:.*\d){7,})(?=(?:.*[A-Za-z]){2,}).{9,}$/.test(p || '');
 const subjectsByGrade = grade => grade === 'العاشر' ? subjects10 : subjects69;
+const escapeHtml = value => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;');
 
 function blankGradeEntry(studentId, semester, subject) {
   return { studentId, semester, subject, d1: null, m: null, d2: null, f: null, q: null, total: null, updatedAt: Date.now() };
@@ -220,7 +226,7 @@ function renderDashboard() {
 
   function drawHome() {
     const posts = db.posts.filter(p => p.to === 'all' || p.to === me.grade || p.to === me.id).slice(-6).reverse();
-    const postsHtml = posts.map(p => `<div class="notice"><b>${p.author}</b><div>${p.text}</div></div>`).join('') || '<p>لا توجد منشورات حالياً.</p>';
+    const postsHtml = posts.map(p => `<div class="notice"><b>${escapeHtml(p.author)}</b><div>${escapeHtml(p.text)}</div></div>`).join('') || '<p>لا توجد منشورات حالياً.</p>';
     const rand = questionBank[Math.floor(Math.random() * questionBank.length)];
     const studentQ = me.role === 'student' ? card('بطاقات الأسئلة', `
       <div class="question">
@@ -248,18 +254,22 @@ function renderDashboard() {
     const postForm = me.role === 'student' ? '' : `
       <form id="postForm" class="stack">
         <textarea name="text" required placeholder="اكتب منشوراً..."></textarea>
-        <label>الصف المستهدف<select name="to">${targets.map(t => `<option value="${t}">${t==='all'?'جميع الصفوف':t}</option>`).join('')}</select></label>
+        <label>الصف المستهدف<select name="to" required><option value="" disabled selected>اختر الفئة المستهدفة</option>${targets.map(t => `<option value="${t}">${t==='all'?'جميع الصفوف':t}</option>`).join('')}</select></label>
         <button class="btn btn-primary">نشر</button>
       </form>
     `;
     const list = db.posts.filter(p => p.to === 'all' || p.to === me.grade || p.to === me.id)
-      .slice().reverse().map(p => `<div class="notice"><b>${p.author}</b>: ${p.text}</div>`).join('') || '<p>لا يوجد منشورات.</p>';
+      .slice().reverse().map(p => `<div class="notice"><b>${escapeHtml(p.author)}</b>: ${escapeHtml(p.text)}</div>`).join('') || '<p>لا يوجد منشورات.</p>';
 
     content.innerHTML = card('المنشورات', postForm + list);
     document.getElementById('postForm')?.addEventListener('submit', e => {
       e.preventDefault();
       const f = new FormData(e.target);
-      db.posts.push({ author: me.name, text: f.get('text'), to: f.get('to') });
+      const text = (f.get('text') || '').toString().trim();
+      const target = (f.get('to') || '').toString().trim();
+      if (!target) return alert('يرجى اختيار الفئة المستهدفة قبل النشر.');
+      if (!text) return alert('يرجى كتابة محتوى المنشور.');
+      db.posts.push({ author: me.name, text, to: target });
       save();
       drawPosts();
     });
